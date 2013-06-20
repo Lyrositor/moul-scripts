@@ -40,26 +40,31 @@ You can contact Cyan Worlds, Inc. by email legal@cyan.com
       Mead, WA   99021
 
  *==LICENSE==* """
-"""
-Module: AhnonayCathedral.py
-Age: AhnonayCathedral
-Date: June 2003
-"""
+
+## @package AhnonayCathedral
+# Ahnonay Cathedral's Age-wide module.
+# @date June 2003: Creation.
 
 from Plasma import *
 from PlasmaTypes import *
 
+## Ahnonay Cathedral's responder.
+# Determines how the player relates to Ahnonay.
 class AhnonayCathedral(ptResponder):
 
+    id = 5398
+    version = 1
+
+    ## Initialize Ahnonay Cathedral's responder.
     def __init__(self):
+
+        PtDebugPrint(u"AhnonayCathedral: Version {}.".format(self.version))
         ptResponder.__init__(self)
-        self.id = 5398
-        self.version = 1
 
-    def OnFirstUpdate(self):
-        pass
-
+    ## Called by Plasma when the Age state has been fully received.
+    # Determines whether the player should be owner of Ahnonay.
     def OnServerInitComplete(self):
+
         owner = None
         vault = ptVault()
         ageStruct = ptAgeInfoStruct()
@@ -80,13 +85,11 @@ class AhnonayCathedral(ptResponder):
                         if chron and chron.getName() == "AhnonayOwner":
                             owner = chron
                     break
-        if owner == None and vault.amOwnerOfCurrentAge():
-            print "I own this Cathedral, but I haven't set myself as Ahnonay owner yet."
+
+        # If the player owns AhnonayCathedral but not Ahnonay.
+        if not owner and vault.amOwnerOfCurrentAge():
+            PtDebugPrint(u"AhnonayCathedral.OnServerInitComplete(): The player owns the Cathedral, but isn't set as owner of Ahnonay yet.", level=kDebugDumpLevel)
             newNode = ptVaultChronicleNode(0)
             newNode.chronicleSetName("AhnonayOwner")
             newNode.chronicleSetValue(str(PtGetClientIDFromAvatarKey(PtGetLocalAvatar().getKey())))
             ageDataFolder.addNode(newNode)
-
-    def OnNotify(self,state,id,events):
-        pass
-        

@@ -40,187 +40,123 @@ You can contact Cyan Worlds, Inc. by email legal@cyan.com
       Mead, WA   99021
 
  *==LICENSE==* """
-"""
-Module: ahnyIslandHut.py
-Age: Ahnonay
-Date: June 2003
-"""
+
+## @package ahnyIslandHut
+# The module for the control tower island in Ahnonay.
+# @date June 2003: Creation.
 
 from Plasma import *
 from PlasmaTypes import *
+
 from xPsnlVaultSDL import *
-import time
+
+# Define the attributes that will be entered in Max.
+ActRotateSwitch = ptAttribActivator(1, "Clk: rotate spheres")
+RespRotateSwitch = ptAttribResponder(2, "Resp: rotate spheres switch")
+SDLWaterCurrent = ptAttribString(3, "SDL: water current")
+ActWaterCurrent = ptAttribActivator(4,"Clk: water current")
+RespCurrentValve = ptAttribResponder(5, "Resp: water current valve", ("on", "off"))
+WaterCurrent1 = ptAttribSwimCurrent(6, "Water current 1")
+WaterCurrent2 = ptAttribSwimCurrent(7, "Water current 2")
+WaterCurrent3 = ptAttribSwimCurrent(8, "Water current 3")
+WaterCurrent4 = ptAttribSwimCurrent(9, "Water current 4")
+RespCurrentChange = ptAttribResponder(10, "Resp: change the water current", ("on", "off"))
+RespRotateSpheres = ptAttribResponder(11, "Resp: rotate the spheres")
+SDLHutDoor = ptAttribString(12, "SDL: hut door")
+ActHutDoor = ptAttribActivator(13, "Clk: hut door switch")
+RespHutDoorBeh = ptAttribResponder(14, "Resp: hut door switch", ("open", "close"))
+RespHutDoor = ptAttribResponder(15, "Resp: hut door", ("open", "close"))
+
+## A list of the water current attributes.
+kCurrents = (WaterCurrent1, WaterCurrent2, WaterCurrent3, WaterCurrent4)
 
 
-#------------
-#max wiring
-#------------
-
-ActRotateSwitch   = ptAttribActivator(1,"clk: rotate spheres")
-RespRotateSwitch   = ptAttribResponder(2,"resp: rotate spheres switch")
-SDLWaterCurrent   = ptAttribString(3,"SDL: water current")
-ActWaterCurrent   = ptAttribActivator(4,"clk: water current")
-RespCurrentValve   = ptAttribResponder(5,"resp: water current valve",['on','off'])
-WaterCurrent1   = ptAttribSwimCurrent(6,"water current 1")
-WaterCurrent2   = ptAttribSwimCurrent(7,"water current 2")
-WaterCurrent3   = ptAttribSwimCurrent(8,"water current 3")
-WaterCurrent4   = ptAttribSwimCurrent(9,"water current 4")
-RespCurrentChange   = ptAttribResponder(10,"resp: change the water current",['on','off'])
-RespRotateSpheres   = ptAttribResponder(11,"resp: rotate the spheres")
-SDLHutDoor   = ptAttribString(12,"SDL: hut door")
-ActHutDoor   = ptAttribActivator(13,"clk: hut door switch")
-RespHutDoorBeh   = ptAttribResponder(14,"resp: hut door switch",['open','close'])
-RespHutDoor   = ptAttribResponder(15,"resp: hut door",['open','close'])
-
-
-#---------
-# globals
-#---------
-
-boolCurrent = 0
-boolHutDoor = 0
-actingAvatar = None
-actingAvatarDoor = None
-
-
+## The responder for the island hut in Ahnonay.
+# Controls the water current and the state of the door.
 class ahnyIslandHut(ptResponder):
 
+    id = 5580
+    version = 1
+
+    ## Initialize the island hut responder.
+    # Defines the island's state variables.
     def __init__(self):
+
+        PtDebugPrint(u"ahnyIslandHut: Version {}.".format(self.version))
         ptResponder.__init__(self)
-        self.id = 5580
-        self.version = 1
+        self.boolCurrent = False
+        self.boolHutDoor = False
+        self.actingAvatar = None
+        self.actingAvatarDoor = None
 
-
+    ## Called by Plasma on receipt of the first plEvalMsg.
+    # Sets the state of the hut and the current according to the Age's SDL.
     def OnFirstUpdate(self):
-        global boolCurrent
-        global boolHutDoor
 
-        try:
-            ageSDL = PtGetAgeSDL()
-        except:
-            print "ahnySphere1MaintBtn.OnServerInitComplete():\tERROR---Cannot find the Ahnonay Age SDL"
+        ageSDL = PtGetAgeSDL()
+        if not ageSDL:
+            PtDebugPrint(u"ahnyIslandHut.OnFirstUpdate(): Cannot find Ahnonay's Age SDL.", level=kErrorLevel)
             ageSDL[SDLWaterCurrent.value] = (0,)
             ageSDL[SDLHutDoor.value] = (0,)
 
-        ageSDL.setFlags(SDLWaterCurrent.value,1,1)
-        ageSDL.setFlags(SDLHutDoor.value,1,1)
-        
+        ageSDL.setFlags(SDLWaterCurrent.value, 1, 1)
+        ageSDL.setFlags(SDLHutDoor.value, 1, 1)
         ageSDL.sendToClients(SDLWaterCurrent.value)
         ageSDL.sendToClients(SDLHutDoor.value)
-        
-        ageSDL.setNotify(self.key,SDLWaterCurrent.value,0.0)
-        ageSDL.setNotify(self.key,SDLHutDoor.value,0.0)
+        ageSDL.setNotify(self.key, SDLWaterCurrent.value, 0.0)
+        ageSDL.setNotify(self.key, SDLHutDoor.value, 0.0)
 
-        boolCurrent = ageSDL[SDLWaterCurrent.value][0]
-        boolHutDoor = ageSDL[SDLHutDoor.value][0]
+        self.boolCurrent = ageSDL[SDLWaterCurrent.value][0]
+        self.boolHutDoor = ageSDL[SDLHutDoor.value][0]
 
-        if boolCurrent:
-            RespCurrentChange.run(self.key,state='on',fastforward=1)
-            print "OnInit, will now enable current"
-            WaterCurrent1.current.enable()
-            WaterCurrent2.current.enable()
-            WaterCurrent3.current.enable()
-            WaterCurrent4.current.enable()
+        # Enable or disable current.
+        RespCurrentChange.run(self.key, state="on" if self.boolCurrent else "off", fastforward=1)
+        PtDebugPrint(u"ahnyIslandHut.OnFirstUpdate(): {}abling current.".format("En" if self.boolCurrent else "Dis"))
+        if self.boolCurrent:
+            for c in kCurrents: c.current.enable()
         else:
-            RespCurrentChange.run(self.key,state='off',fastforward=1)
-            print "OnInit, will now disable current"
-            WaterCurrent1.current.disable()
-            WaterCurrent2.current.disable()
-            WaterCurrent3.current.disable()
-            WaterCurrent4.current.disable()
+            for c in kCurrents: c.current.disable()
 
-        if boolHutDoor:
-            RespHutDoor.run(self.key,state='open',fastforward=1)
-        else:
-            RespHutDoor.run(self.key,state='close',fastforward=1)
+        # Open or close the door.
+        RespHutDoor.run(self.key, state="open" if self.boolHutDoor else "close", fastforward=1)
 
+    ## Called by Plasma when an SDL notify is received.
+    # Used to toggle current and door SDL settings.
+    def OnSDLNotify(self, varName, sdlName, playerID, tag):
 
-    def OnSDLNotify(self,VARname,SDLname,playerID,tag):
-        global boolCurrent
-        global boolHutDoor
         ageSDL = PtGetAgeSDL()
 
-        if VARname == SDLWaterCurrent.value:
-            boolCurrent = ageSDL[SDLWaterCurrent.value][0]
-            if boolCurrent:
-                RespCurrentChange.run(self.key,state='on')
-            else:
-                RespCurrentChange.run(self.key,state='off')
+        if varName == SDLWaterCurrent.value:
+            self.boolCurrent = ageSDL[SDLWaterCurrent.value][0]
+            RespCurrentChange.run(self.key, state="on" if self.boolCurrent else "off")
+        elif varName == SDLHutDoor.value:
+            self.boolHutDoor = ageSDL[SDLHutDoor.value][0]
+            RespHutDoor.run(self.key, state="open" if self.boolHutDoor else "close")
 
-        elif VARname == SDLHutDoor.value:
-            boolHutDoor = ageSDL[SDLHutDoor.value][0]
-            if boolHutDoor:
-                RespHutDoor.run(self.key,state='open')
-            else:
-                RespHutDoor.run(self.key,state='close')
+    ## Called by Plasma on receipt of a plNotifyMsg.
+    # Used to toggle current and door settings visibly.
+    def OnNotify(self, state, ID, events):
 
+        ageSDL = PtGetAgeSDL() 
 
-    def OnNotify(self,state,id,events):
-        global boolCurrent
-        global boolHutDoor
-        global actingAvatar
-        global actingAvatarDoor
-        ageSDL = PtGetAgeSDL()
-        
-        #~ print"anhySphere1MaintBtn::OnNotify id ",id," state ",state
-        #~ if (state == 0):
-            #~ return
+        if ID == ActWaterCurrent.id and state:
+            self.actingAvatar = PtFindAvatar(events)
+            RespCurrentValve.run(self.key, state="off" if self.boolCurrent else "on", avatar=PtFindAvatar(events))
 
-        #if id == ActRotateSwitch.id and state:
-        #    RespRotateSwitch.run(self.key,avatar=PtGetLocalAvatar())
+        elif ID == RespCurrentValve.id and self.actingAvatar == PtGetLocalAvatar():
+            ageSDL[SDLWaterCurrent.value] = (int(not self.boolCurrent),)
 
-        #elif id == RespRotateSwitch.id:
-        #    RespRotateSpheres.run(self.key)
+        elif ID == RespCurrentChange.id:
+            for current in kCurrents:
+                PtDebugPrint(u"ahnyIslandHut.OnNotify(): {}abling current.".format("En" if self.boolCurrent else "Dis"))
+                if self.boolCurrent:
+                    current.enable()
+                else:
+                    current.disable()
 
-        #elif id == RespRotateSpheres.id:
-        #    if boolHutDoor:
-        #        ageSDL[SDLHutDoor.value] = (0,)
+        elif ID == ActHutDoor.id and state:
+            self.actingAvatarDoor = PtFindAvatar(events)
+            RespHutDoorBeh.run(self.key, state="close" if self.boolHutDoor else "open", avatar=PtFindAvatar(events))
 
-        #    currentSphere = ageSDL["ahnyCurrentSphere"][0]
-        #    if currentSphere == 3:
-        #        ageSDL["ahnyCurrentSphere"] = (1,)
-        #    else:
-        #        ageSDL["ahnyCurrentSphere"] = ((currentSphere + 1),)
-        
-        
-        if id == ActWaterCurrent.id and state:
-            actingAvatar = PtFindAvatar(events)
-            if boolCurrent:
-                RespCurrentValve.run(self.key,state='off',avatar=PtFindAvatar(events))
-            else:
-                RespCurrentValve.run(self.key,state='on',avatar=PtFindAvatar(events))
-
-        elif id == RespCurrentValve.id and actingAvatar == PtGetLocalAvatar():
-            if boolCurrent:
-                ageSDL[SDLWaterCurrent.value] = (0,)
-            else:
-                ageSDL[SDLWaterCurrent.value] = (1,)
-
-        elif id == RespCurrentChange.id:
-            if boolCurrent:
-                print "will now enable current"
-                WaterCurrent1.current.enable()
-                WaterCurrent2.current.enable()
-                WaterCurrent3.current.enable()
-                WaterCurrent4.current.enable()
-            else:
-                print "will now disable current"
-                WaterCurrent1.current.disable()
-                WaterCurrent2.current.disable()
-                WaterCurrent3.current.disable()
-                WaterCurrent4.current.disable()
-
-        elif id == ActHutDoor.id and state:
-            actingAvatarDoor = PtFindAvatar(events)
-            if boolHutDoor:
-                RespHutDoorBeh.run(self.key,state='close',avatar=PtFindAvatar(events))
-            else:
-                RespHutDoorBeh.run(self.key,state='open',avatar=PtFindAvatar(events))
-
-        elif id == RespHutDoorBeh.id and actingAvatarDoor == PtGetLocalAvatar():
-            if boolHutDoor:
-                ageSDL[SDLHutDoor.value] = (0,)
-            else:
-                ageSDL[SDLHutDoor.value] = (1,)
-
-
+        elif ID == RespHutDoorBeh.id and self.actingAvatarDoor == PtGetLocalAvatar():
+            ageSDL[SDLHutDoor.value] = (int(not self.boolHutDoor),)

@@ -41,132 +41,172 @@ You can contact Cyan Worlds, Inc. by email legal@cyan.com
 
  *==LICENSE==* """
 
+## @package ahnyQuabs
+# The controls for the quabs on Ahnonay.
+# @author Derek Odell
+# @author Hoikas
+# @date April 2007: Creation.
+# @date 12th of May 2012: Major rewrite.
+
 from Plasma import *
 from PlasmaTypes import *
+
 import math
 import random
 
-# define the attributes that will be entered in max
-deadZone                    = ptAttribActivator(1, "detector for dead zone")
-quabObjects                 = ptAttribSceneobjectList(2, "quab spawners")
-SDLQuabs                    = ptAttribString(3, "SDL: quabs")
+# Define the attributes that will be entered in Max.
+DeadZone = ptAttribActivator(1, "Detector for dead zone")
+QuabObjects = ptAttribSceneobjectList(2, "Quab spawners")
+SDLQuabs = ptAttribString(3, "SDL: quabs")
 
+## Time required for quabs to spawn.
 # How long does it take for more quabs to be born? Eight hours, evidently...
 kQuabGestationTime = 8 * 60 * 60
 
-# Stupid konstants the stupid Cyan tech artists didn't add in max...
+# Stupid konstants the stupid Cyan tech artists didn't add in Max...
 # Did I mention how STUPID this is?
 kLastQuabUpdate = "ahnyQuabsLastUpdate"
 kMaxNumQuabs = 20
 kQuabAvatarName = "Quab"
 
 # Silly behavior name constants
-kQuabIdleBehNames = ("Idle02", "Idle03",)
-kQuabRunBehNames  = ("Run02", "Run03",)
+kQuabIdleBehNames = ("Idle02", "Idle03")
+kQuabRunBehNames  = ("Run02", "Run03")
 
+## Modifier for Ahnonay quabs.
+# Controls the quabs' fleeing behavior and spawning.
 class ahnyQuabs(ptModifier, object):
+
+    id = 5946
+    version = 2
+
+    ## Initialize the quabs modifier.
     def __init__(self):
+
+        PtDebugPrint(u"ahnyQuabs: Version {}.".format(self.version))
         ptModifier.__init__(self)
-        self.id = 5946
-        self.version = 2
         self.brains = []
         random.seed()
-        print "__init__ahnyQuabs v%d " % (self.version)
 
-    def _last_update_get(self):
+    ## Getter for the lastUpdate property.
+    # Gets the last time a quab was killed/born.
+    def _LastUpdateGet(self):
+
         ageSDL = PtGetAgeSDL()
         return ageSDL[kLastQuabUpdate][0]
-    last_update = property(_last_update_get, doc="Gets the last time a quab was killed/born")
 
-    def _quabs_get(self):
+    ## Getter for the quabs property.
+    # Gets the number of quabs alive.
+    def _QuabsGet(self):
+
         ageSDL = PtGetAgeSDL()
         return ageSDL[SDLQuabs.value][0]
-    def _quabs_set(self, value):
+
+    ## Setter for the quabs property.
+    # Updates the number of quabs alive.
+    def _QuabsSet(self, value):
+
         ageSDL = PtGetAgeSDL()
         ageSDL[SDLQuabs.value] = (value,)
         ageSDL[kLastQuabUpdate] = (PtGetServerTime(),)
-    quabs = property(_quabs_get, _quabs_set, doc="Gets the number of quabs alive")
 
+    # Properties to manage the quabs.
+    lastUpdate = property(_LastUpdateGet, doc="Gets the last time a quab was killed/born.")
+    quabs = property(_QuabsGet, _QuabsSet, doc="Gets the number of quabs alive")
+
+    ## Called by Plasma when the Age state has been fully received.
+    # Prepares the quabs on arrival.
     def OnServerInitComplete(self):
-        PtDebugPrint("ahnyQuabs.OnServerInitComplete():\tWhen I got here...", level=kWarningLevel)
-        PtDebugPrint("ahnyQuabs.OnServerInitComplete():\t... there were already %i quabs" % self.quabs, level=kWarningLevel)
+
+        PtDebugPrint(u"ahnyQuabs.OnServerInitComplete(): There were already {} quabs when the player arrived.".format(self.quabs))
         self.brains = PtGetAIAvatarsByModelName(kQuabAvatarName)
 
-        # Sanity Check: Before we think about doing any processing, make sure there are no quabs
-        #               already loaded. We may have arrived after the last man left but before the
-        #               server shut down. Therefore, we will already have quabs... So we don't want
-        #               to spawn another 20 or so dupe avatar clones.
-        if len(self.brains) != 0:
-            PtDebugPrint("ahnyQuabs.OnServerInitComplete():\t... and they were already spawned!", level=kWarningLevel)
+        # Sanity Check: Before we think about doing any processing, make sure
+        # there are no quabs already loaded. We may have arrived after the last
+        # man left but before the server shut down. Therefore, we will already
+        # have quabs... So we don't want to spawn another 20 or so dupe avatar
+        # clones.
+        if self.brains:
+            PtDebugPrint(u"ahnyQuabs.OnServerInitComplete(): Those quabs were already spawned.")
             for brain in self.brains:
                 self._PrepCritterBrain(brain[0])
             return
 
         if self.sceneobject.isLocallyOwned():
-            delta = PtGetServerTime() - self.last_update
+            delta = PtGetServerTime() - self.lastUpdate
             toSpawn = int(math.floor(delta / kQuabGestationTime))
             if toSpawn:
-                PtDebugPrint("ahnyQuabs.OnServerInitComplete():\t... and I need to spawn %i more" % toSpawn, level=kWarningLevel)
+                PtDebugPrint(u"ahnyQuabs.OnServerInitComplete(): {} more quabs need to be spawned.".format(toSpawn))
                 self.quabs += toSpawn
             if self.quabs > kMaxNumQuabs:
-                PtDebugPrint("ahnyQuabs.OnServerInitComplete():\t... woah, %i quabs?!" % self.quabs, level=kWarningLevel)
+                PtDebugPrint(u"ahnyQuabs.OnServerInitComplete(): Too many quabs: {}.".format(self.quabs))
                 self.quabs = kMaxNumQuabs
 
-            # Shuffle the spawn points around so we don't get the same quabs appearing
-            # every single time. That would be quite boring.
-            qSpawns = list(quabObjects.value)
+            # Shuffle the spawn points around so we don't get the same quabs
+            # appearing every single time. That would be quite boring.
+            qSpawns = list(QuabObjects.value)
             random.shuffle(qSpawns)
 
             # On quab spawning...
-            # We will load the avatar clones manually if we are the first one in.
-            # We will obtain the ptCritterBrains in an OnAIMsg callback.
+            # We will load the avatar clones manually if we are the first one
+            # in. We will obtain the ptCritterBrains in an OnAIMsg callback.
             for i in xrange(self.quabs):
-                PtLoadAvatarModel(kQuabAvatarName, qSpawns[i].getKey(), "Quab %i" % i)
+                PtLoadAvatarModel(kQuabAvatarName, qSpawns[i].getKey(), "Quab {}".format(i))
 
+    ## Called by Plasma on receipt of a message for an AI.
+    # Starts preparation of the brains for the quabs.
     def OnAIMsg(self, brain, msgType, userStr, args):
+
         if msgType == PtAIMsgType.kBrainCreated:
-            # Init the brain and push it into our collection
-            PtDebugPrint("ahnyQuabs.OnAIMsg():\t%s created" % userStr, level=kDebugDumpLevel)
+            # Init the brain and push it into our collection.
+            PtDebugPrint(u"ahnyQuabs.OnAIMsg(): {} created.".format(userStr), level=kDebugDumpLevel)
             self._PrepCritterBrain(brain)
             self.brains.append((brain, userStr,))
-            return
 
-        if msgType == PtAIMsgType.kArrivedAtGoal:
-            # Not really important, but useful for debugging
-            PtDebugPrint("ahnyQuabs.OnAIMsg():\t%s arrived at goal" % userStr, level=kDebugDumpLevel)
-            return
+        elif msgType == PtAIMsgType.kArrivedAtGoal:
+            # Not really important, but useful for debugging.
+            PtDebugPrint(u"ahnyQuabs.OnAIMsg(): {} arrived at goal.".format(userStr), level=kDebugDumpLevel)
 
-    def OnNotify(self, state, id, events):
-        if id == deadZone.id:
-            # Make sure this isn't the player jumping into the water for a quick swim
-            # Musing: Ideally, we would despawn the clone here since it's now useless,
-            #         but removing the brain without causing rampant issues might be problematic...
+    ## Called by Plasma on receipt of a plNotifyMsg.
+    # Used to update the number of quabs when one has jumped into the water.
+    def OnNotify(self, state, ID, events):
+
+        if ID == DeadZone.id:
+            # Make sure this isn't the player jumping into the water for a
+            # quick swim.
+            # Musing: Ideally, we would despawn the clone here since it's now
+            #         useless, but removing the brain without causing rampant
+            #         issues might be problematic...
             if PtFindAvatar(events) != PtGetLocalAvatar():
                 self.quabs -= 1
-                PtDebugPrint("ahnyQuabs.OnNotify():\tQuabs remaining: %i" % self.quabs, level=kWarningLevel)
-                return
+                PtDebugPrint("ahnyQuabs.OnNotify(): Quabs remaining: {}.".format(self.quabs))
 
+    ## Called by Plasma on each frame.
+    # Makes the quab think and react to the player's eventual presence.
     def OnUpdate(self, seconds, delta):
+
         for brain, name in self.brains:
             # Meh, I'm tired of huge indentation levels
             # If you think running this every frame is a bad idea, remember how
-            # badly the quab AI sucked in MOUL. This won't kill you.
+            # badly the quab AI sucked in MO:UL. This won't kill you.
             self._Think(brain, name)
 
+    ## Basic quab thought logic (scurry, scurry, scurry).
+    # Quabs spook very easily. They are also stupid like dogs - they run in a
+    # straight line away from whatever is chasing them. Fun fact: alligators
+    # can catch dogs because they do the same thing. The mammalian adaptation
+    # is the ability to turn quickly (which the dog does not actually do)...
+    # This evolutionary biology lesson is courtesy of Hoikas, the Mammalogy
+    # drop-out.
     def _Think(self, brain, name):
-        """Basic quab thought logic (scurry, scurry, scurry)"""
+
         running = self._IsRunningAway(brain)
 
-        # Quabs spook very easily. They are also stupid like dogs--they run
-        # in a straight line away from whatever is chasing them. Fun fact: alligators
-        # can catch dogs because they do the same thing. The mammalian adaptation is the
-        # ability to turn quickly (which the dog does not actually do)...
-        # This evolutionary biology lesson is thanks to Hoikas, the Mammalogy drop-out
         monsters = brain.playersICanHear()
-        if len(monsters) == 0:
+        if not monsters:
             if running:
-                PtDebugPrint("ahnyQuabs._Think():\t%s is now safe." % name, level=kDebugDumpLevel)
-                self._RunAway(brain, False)
+                PtDebugPrint("ahnyQuabs._Think(): {} is now safe.".format(name), level=kDebugDumpLevel)
+                brain.startBehavior(brain.idleBehaviorName())
             return
         runaway  = None
         for monster in monsters:
@@ -176,35 +216,33 @@ class ahnyQuabs(ptModifier, object):
                 runaway = runaway.add(vec)
             else:
                 runaway = vec
-        runaway = runaway.scale(100) # so we don't just move a centimeter away
+        runaway = runaway.scale(100)  # So we don't just move a centimeter away.
         curPos = brain.getSceneObject().position()
         endPos = ptPoint3(curPos.getX() + runaway.getX(), curPos.getY() + runaway.getY(), curPos.getZ() + runaway.getZ())
 
-        # Now, actually make the quab run away
+        # Now, actually make the quab run away.
         if not running:
             # Note: low level brain will make the quab play the run behavior
-            #       no need to court a race condition by playing it here
-            PtDebugPrint("ahnyQuabs._Think():\tTime for %s to run away!" % name, level=kDebugDumpLevel)
+            #       no need to court a race condition by playing it here.
+            PtDebugPrint("ahnyQuabs._Think(): Time for {} to run away!".format(name), level=kDebugDumpLevel)
         brain.goToGoal(endPos)
 
+    ## Prepares the quab's brain for running or idling.
+    # Attaches quab behaviors to newly initialized/fetched critter brains.
     def _PrepCritterBrain(self, brain):
-        """Attaches quab behaviors to newly initialized/fetched critter brains"""
+
         brain.addReceiver(self.key)
         for beh in kQuabIdleBehNames:
             brain.addBehavior(beh, brain.idleBehaviorName())
         for beh in kQuabRunBehNames:
             brain.addBehavior(beh, brain.runBehaviorName(), randomStartPos=0)
 
+    ## Checks if the brain of the quab is in running or idling behavior.
+    # A quab should only be in one of two states: running or idling.
     def _IsRunningAway(self, brain):
+
         if brain.runningBehavior(brain.runBehaviorName()):
             return True
-        if brain.runningBehavior(brain.idleBehaviorName()):
+        elif brain.runningBehavior(brain.idleBehaviorName()):
             return False
-        raise RuntimeError("Quab brain running neither the idle nor the run behavior. WTF?")
-
-    def _RunAway(self, brain, runAway=True):
-        """Quick helper because I'm lazy and the behavior apis are really stupid"""
-        if runAway:
-            brain.startBehavior(brain.runBehaviorName())
-        else:
-            brain.startBehavior(brain.idleBehaviorName())
+        raise RuntimeError("Quab brain running neither the idle nor the run behavior. What?")

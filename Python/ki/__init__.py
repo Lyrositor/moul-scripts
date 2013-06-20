@@ -1191,7 +1191,7 @@ class xKI(ptModifier):
             except NameError:
                 pass
 
-    ## Called by Plasma when a timer is running.
+    ## Called by Plasma when a timer is over.
     # Used to handle fading and the current time in the BigKI.
     def OnTimer(self, ID):
 

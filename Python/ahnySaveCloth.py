@@ -40,40 +40,42 @@ You can contact Cyan Worlds, Inc. by email legal@cyan.com
       Mead, WA   99021
 
  *==LICENSE==* """
-"""
-Module: ahnySaveCloth
-Age: Most post-prime ages
-Date: January 2004
-Author: Adam Van Ornum
-Sets a save point
-"""
+
+## @package ahnySaveCloth
+# The controls for the Path of the Shell save cloths.
+# @author Adam Van Ornum
+# @date January 2004
 
 from Plasma import *
 from PlasmaTypes import *
 
-# define the attributes that will be entered in max
+# Define the attributes that will be entered in Max.
 Activator = ptAttribActivator(1,"Activator: Cloth Clickable")
 OneShotResp = ptAttribResponder(2, "Resp: One Shot")
-clothID  = ptAttribString(3,"save cloth ID")
+ClothID  = ptAttribString(3, "Save cloth ID")
 
-avatar          = None
-link            = None
-whereAmI        = 0
-gotSC           = 0
-sdlSC           = ""
 
+## Modifier for Ahnonay save cloths.
+# Manages all the save cloths.
 class ahnySaveCloth(ptModifier):
-    def __init__(self):
-        ptModifier.__init__(self)
-        self.id = 5424
-        self.version = 1
-        print "DEBUG: ahnySaveCloth.__init__: v.", self.version
 
+    id = 5424
+    version = 1
+
+    ## Initialize the save cloths modifier.
+    def __init__(self):
+
+        PtDebugPrint(u"ahnySaveCloth: Version {}.".format(self.version))
+        ptModifier.__init__(self)
+        self.avatar = None
+        self.link = None
+        self.whereAmI = 0
+        self.gotSC = 0
+        self.sdlSC = ""
+
+    ## Called by Plasma on receipt of the first plEvalMsg.
+    # Gets the setting for the save cloth.
     def OnFirstUpdate(self):
-        global sdlSC
-        global gotSC
-        global link
-        global whereAmI
 
         ageStruct = ptAgeInfoStruct()
         ageStruct.setAgeFilename("Personal")
@@ -93,18 +95,20 @@ class ahnySaveCloth(ptModifier):
                         ageDataChild = ageDataChildRef.getChild()
                         chron = ageDataChild.upcastToChronicleNode()
                         if chron and chron.getName() == "AhnonayLink":
-                            link = chron.getValue()
+                            self.link = chron.getValue()
+                            break
+                    break
 
-        agevault = ptAgeVault()
-        ageinfo = agevault.getAgeInfo()
-        guid = ageinfo.getAgeInstanceGuid()
+        ageVault = ptAgeVault()
+        ageInfo = ageVault.getAgeInfo()
+        guid = ageInfo.getAgeInstanceGuid()
+        ageSDL = PtGetAgeSDL()
 
-        if guid == link:
-            ageSDL = PtGetAgeSDL()
+        if guid == self.link:
             sphere = ageSDL["ahnyCurrentSphere"][0]
             
-            linkmgr = ptNetLinkingMgr()
-            curLink = linkmgr.getCurrAgeLink()
+            linkMgr = ptNetLinkingMgr()
+            curLink = linkMgr.getCurrAgeLink()
             spawnPoint = curLink.getSpawnPoint()
 
             spTitle = spawnPoint.getTitle()
@@ -112,80 +116,71 @@ class ahnySaveCloth(ptModifier):
 
             if spTitle == "SCSavePoint":
                 if spName == "SaveClothPoint7" or spName == "SaveClothPoint8":
-                    print "linking to hub or hut"
-                    whereAmI = 4
+                    PtDebugPrint(u"ahnySaveCloth.OnFirstUpdate(): Linking to hub or hut.")
+                    self.whereAmI = 4
                 else:
+                    PtDebugPrint(u"ahnySaveCloth.OnFirstUpdate(): Sphere 0{} loaded with offset: {}.".format(sphere, offset))
                     offset = str(ageSDL["ahnyCurrentOffset"][0])
-                    print "Ahnonay.OnPageLoad(): Sphere0%s loaded with offset:%s" % (sphere, offset)
-                    whereAmI = (int(sphere) - int(offset)) % 4
-                    if whereAmI == 0:
-                        whereAmI = 4
+                    self.whereAmI = (int(sphere) - int(offset)) % 4
+                    if self.whereAmI == 0:
+                        self.whereAmI = 4
             else:
-                whereAmI = sphere
-            print "ahnySaveCloth.OnServerInitComplete(): I am age owner in %d" % (whereAmI)
+                self.whereAmI = sphere
+            PtDebugPrint(u"ahnySaveCloth.OnFirstUpdate(): I am Age owner in {}.".format(self.whereAmI))
 
-        # SaveCloth SDL stuff, for use with POTS symbols
-        sdlSC = "ahnyGotSaveCloth" + clothID.value
+        # SaveCloth SDL stuff, for use with PotS symbols.
+        self.sdlSC = "ahnyGotSaveCloth" + ClothID.value
         try:
-            ageSDL = PtGetAgeSDL()
-            ageSDL.setFlags(sdlSC,1,1)
-            ageSDL.sendToClients(sdlSC)
-            ageSDL.setNotify(self.key,sdlSC,0.0)
-            gotSC = ageSDL[sdlSC][0]
-            print "ahnySaveCloth.OnServerInitComplete():\t found sdl: ",sdlSC,", which = ",gotSC
+            ageSDL.setFlags(self.sdlSC, 1, 1)
+            ageSDL.sendToClients(self.sdlSC)
+            ageSDL.setNotify(self.key, self.sdlSC, 0.0)
+            self.gotSC = ageSDL[self.sdlSC][0]
+            PtDebugPrint("ahnySaveCloth.OnFirstUpdate(): Found SDL: {}, which = {}.".format(self.sdlSC, self.gotSC))
         except:
-            print "ERROR.  Couldn't find sdl: ",sdlSC,", defaulting to 0"
+            PtDebugPrint("ahnySaveCloth.OnFirstUpdate(): Couldn't find SDL {}, defaulting to 0.".format(self.sdlSC), level=kErrorLevel)
 
-        ageSDL.setFlags("ahnyCurrentSphere",1,1)
+        ageSDL.setFlags("ahnyCurrentSphere", 1, 1)
         ageSDL.sendToClients("ahnyCurrentSphere")
-        ageSDL.setNotify(self.key,"ahnyCurrentSphere",0.0)
+        ageSDL.setNotify(self.key, "ahnyCurrentSphere", 0.0)
 
-        ageSDL.setFlags("ahnyCurrentOffset",1,1)
+        ageSDL.setFlags("ahnyCurrentOffset", 1, 1)
         ageSDL.sendToClients("ahnyCurrentOffset")
-        ageSDL.setNotify(self.key,"ahnyCurrentOffset",0.0)
+        ageSDL.setNotify(self.key, "ahnyCurrentOffset", 0.0)
 
-    def OnSDLNotify(self,VARname,SDLname,playerID,tag):
-        global gotSC
-        global sdlSC
+    ## Called by Plasma when an SDL notify is received.
+    # Gets the Ahnonay save cloths that have been obtained.
+    def OnSDLNotify(self, varName, sdlName, playerID, tag):
 
-        if VARname != sdlSC:
+        if varName != self.sdlSC:
             return
         ageSDL = PtGetAgeSDL()
-        PtDebugPrint("xSaveCloth.OnSDLNotify():\t VARname:%s, SDLname:%s, tag:%s, value:%d" % (VARname,SDLname,tag,ageSDL[sdlSC][0]))
-        gotSC = ageSDL[sdlSC][0]
+        self.gotSC = ageSDL[self.sdlSC][0]
 
-    def OnNotify(self,state,id,events):
-        global avatar
-        global whereAmI
-        global link
-
-        print "DEBUG: ahnySaveCloth::onNotify, id ",id
+    ## Called by Plasma on receipt of a plNotifyMsg.
+    # Used to handle cloths being pressed.
+    def OnNotify(self, state, ID, events):
 
         if not state:
             return
 
-        if id == Activator.id:
-            #Activator.disable()
-            avatar = PtFindAvatar(events)
-            OneShotResp.run(self.key, avatar=PtFindAvatar(events)) # run the oneshot
+        if ID == Activator.id:
+            self.avatar = PtFindAvatar(events)
+            OneShotResp.run(self.key, avatar=PtFindAvatar(events))
 
-        elif id == OneShotResp.id and avatar == PtGetLocalAvatar():
-            agevault = ptAgeVault()
-            ageinfo = agevault.getAgeInfo()
-            guid = ageinfo.getAgeInstanceGuid()
+        elif ID == OneShotResp.id and self.avatar == PtGetLocalAvatar():
+            ageVault = ptAgeVault()
+            ageInfo = ageVault.getAgeInfo()
+            guid = ageInfo.getAgeInstanceGuid()
 
-            if guid == link:
-                print "I'm the age owner, setting spawnpoint"
-                #Activator.enable()
+            if guid == self.link:
+                PtDebugPrint(u"ahnySaveCloth.OnNotify(): Player is the Age owner; setting spawn point.")
                 
                 ageSDL = PtGetAgeSDL()
                 sphere = ageSDL["ahnyCurrentSphere"][0]
-                offset = (sphere - whereAmI) % 4
-                print "ahnySaveCloth.OnNotify: Offset = %d" % (offset)
+                offset = (sphere - self.whereAmI) % 4
+                PtDebugPrint(u"ahnySaveCloth.OnNotify(): Offset = {}.".format(offset))
                 ageSDL["ahnyCurrentOffset"] = (offset,)
 
-                agevault = ptAgeVault()
-                ageinfo = agevault.getAgeInfo()
                 spawn = None
 
                 ageStruct = ptAgeInfoStruct()
@@ -207,73 +202,15 @@ class ahnySaveCloth(ptModifier):
                                 chron = ageDataChild.upcastToChronicleNode()
                                 if chron and chron.getName() == "AhnonaySpawnPoints":
                                     spawn = chron.getValue().split(";")
-                                    newSpawn = "%s;SCSavePoint,SaveClothPoint%s" % (spawn[0],clothID.value)
-                                    print newSpawn
+                                    newSpawn = "{};SCSavePoint,SaveClothPoint{}".format(spawn[0], ClothID.value)
+                                    PtDebugPrint(u"ahnySaveCloth.OnNotify(): New spawn = {}.".format(newSpawn))
                                     chron.setValue(newSpawn) 
-                                    if not gotSC:
-                                        ageSDL = PtGetAgeSDL()
-                                        ageSDL[sdlSC] = (1,)
+                                    if not self.gotSC:
+                                        ageSDL[self.sdlSC] = (1,)
                                     return
-
-                print "ahnySaveCloth.OnNotify(): ERROR: couldn't find chron node"
-
+                PtDebugPrint(u"ahnySaveCloth.OnNotify(): Couldn't find chronicle node.", level=kErrorLevel)
 
             else:
-                print "I'm not the age owner, so I don't do anything."
-
-
-
-
-
-
-
-
-            '''
-            vault = ptVault()
-            myAges = vault.getAgesIOwnFolder()
-            myAges = myAges.getChildNodeRefList()
-            for ageInfo in myAges:
-                link = ageInfo.getChild()
-                link = link.upcastToAgeLinkNode()
-                info = link.getAgeInfo()
-                if not info:
-                    continue
-                ageName = info.getAgeFilename()
-                spawnPoints = link.getSpawnPoints()
-    
-                if ageName == "Ahnonay":
-                    ahnySDL = info.getAgeSDL()
-                    ahnyRecord = ahnySDL.getStateDataRecord()
-                    currentCloth = ahnyRecord.findVar("ahnyCurrentSaveCloth")
-                    currentSphere = ahnyRecord.findVar("ahnyCurrentSphere")
-                    if (clothID.value):
-                        clothNumber = int(clothID.value)
-                        activeSphere = currentSphere.getInt(0)
-
-                        agevault = ptAgeVault()
-                        currentage = int(agevault.getAgeInfo().getAgeFilename()[-1])
-                        print "currently in sphere:", currentage
-
-                        currentpos = (currentage - activeSphere) % 4
-
-                        if clothNumber > 6 and clothNumber < 25:
-                            clothOffset = clothNumber % 6
-                            if clothOffset == 0:
-                                clothOffset = 6
-                        else:
-                            clothOffset = clothNumber
-                        
-                        currentCloth.setInt(clothOffset,0)
-                        currentCloth.setInt(currentpos,1)
-                        print"current save cloth updated to number", clothOffset, " from cloth value of", clothNumber
-                        print"current save position updated to:", currentpos
-                    else:
-                        print"missing sphere identifier string!"
-                    ahnySDL.setStateDataRecord(ahnyRecord)
-                    ahnySDL.save()
-                    return
-            '''
-
+                PtDebugPrint(u"ahnySaveCloth.OnNotify(): Player is not the Age owner, cannot do anything.")
         else:
-            PtDebugPrint("ERROR: ahnySaveCloth.OnNotify: Error trying to access the Vault.")
-
+            PtDebugPrint(u"ahnySaveCloth.OnNotify(): Error trying to access the Vault.", level=kErrorLevel)
