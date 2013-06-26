@@ -806,6 +806,7 @@ class CommandsProcessor:
         if PtIsInternalRelease():
             commands.update(kCommands.Internal)
         commands.update(kCommands.EasterEggs)
+        commands.update(kCommands.MarkerEditor)
 
         # Does the message contain a standard command?
         for command, function in commands.iteritems():
@@ -1283,3 +1284,32 @@ class CommandsProcessor:
                 self.chatMgr.AddChatLine(None, pOut, 0)
         else:
             self.chatMgr.AddChatLine(None, "There is nothing there but lint.", 0)
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~#
+    # Marker Editor Commands #
+    #~~~~~~~~~~~~~~~~~~~~~~~~#
+
+    ## Downloads the specified Marker Game to a file.
+    def DownloadGame(self, gameID):
+
+        if gameID is not None:
+            try:
+                gameID = int(gameID)
+                xMarkerEditor.DownloadGame(self, gameID)
+            except ValueError:
+                self.DisplayStatusMessage("Please specify a valid numeric ID.")
+        else:
+            self.DisplayStatusMessage("Please specify the ID of the game you wish to download.")
+
+    ## Uploads the specified Marker Game from a file.
+    def UploadGame(self, gameFileName):
+
+        if gameFileName:
+            xMarkerEditor.UploadGame(self, gameFileName)
+        else:
+            self.DisplayStatusMessage("Please specify the filename in \"Games\" you want opened.")
+
+    ## Lists all the Marker Games available for download.
+    def ListGames(self, params):
+
+        xMarkerEditor.ListGames(self)

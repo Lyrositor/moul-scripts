@@ -80,6 +80,10 @@ import xKIChat
 from xKIConstants import *
 from xKIHelpers import *
 
+# Marker Editor.
+import xMarkerEditor
+import yaml
+
 # Define the attributes that will be entered in Max.
 KIBlackbar = ptAttribGUIDialog(1, "The Blackbar dialog")
 xKIChat.KIBlackbar = KIBlackbar
@@ -276,6 +280,9 @@ class xKI(ptModifier):
 
         ## The chatting manager.
         self.chatMgr = xKIChat.xKIChat(self.StartFadeTimer, self.KillFadeTimer, self.FadeCompletely)
+
+        ## Marker Editor.
+        self.editor = xMarkerEditor.GetEditor()
 
     ## Unloads any loaded dialogs upon exit.
     def __del__(self):
@@ -1034,109 +1041,196 @@ class xKI(ptModifier):
     # The game client handles Marker Games.
     def OnGameCliMsg(self, msg):
 
-        msgType = msg.getType()
+        if self.editor["uploadedGame"]:
+            msg = msg.upcastToGameMsg()
+            msgType = msg.getType()
+            if msgType == PtGameCliMsgTypes.kGameCliMarkerMsg:
+                markerMsgType = msg.getMarkerMsgType()
+                msg = msg.upcastToFinalMarkerMsg()
+                if markerMsgType == PtMarkerMsgTypes.kMarkerMarkerAdded:
+                    self.editor["uploadedGamesMarkers"] += 1
+                if self.editor["uploadedGamesMarkers"] == self.editor["uploadedGamesMarkersTotal"]:
+                    self.editor["uploadedGame"] = False
+            
+        # If the user requested a marker game download... 
+        elif self.editor["downloading"]:
+            
+            # Initialize the Game Client.
+            if self.editor["client"] is None:
+                self.editor["client"] = msg.getGameCli().upcastToMarkerGame()
+            
+            msg = msg.upcastToGameMsg()
+            msgType = msg.getType()
+            
+            # If the message is a marker game message...
+            if msgType == PtGameCliMsgTypes.kGameCliMarkerMsg:
+                markerMsgType = msg.getMarkerMsgType()
+                msg = msg.upcastToFinalMarkerMsg()
 
-        if msgType == PtGameCliMsgTypes.kGameCliPlayerJoinedMsg:
-            joinMsg = msg.upcastToFinalGameCliMsg()
-            if joinMsg.playerID() != PtGetLocalClientID():
-                return
-            if self.markerGameDisplay is not None:
-                self.markerGameDisplay.registerPlayerJoin(joinMsg)
-            else:
-                self.markerGameManager.registerPlayerJoin(joinMsg)
-            return
+                # If a marker is being added...
+                if markerMsgType == PtMarkerMsgTypes.kMarkerMarkerAdded:
+                    m = msg
+                    self.editor["game"]["markers"].append({"age" : m.age(), "text" : m.name(), "coords" : (m.x(), m.y(), m.z())})
+                # Else if this is the last message...
+                elif markerMsgType == PtMarkerMsgTypes.kMarkerGameNameChanged:
+                    self.editor["game"]["creator"] = PtGetLocalPlayer().getPlayerName()
+                    filename = ""
+                    for c in self.editor["game"]["creator"]:
+                        if c.isalnum():
+                            filename += c
+                    file = open("Games/" + filename + "." + str(self.editor["downloading_id"]) + ".txt", "w")
+                    file.write(yaml.dump(self.editor["game"], indent=4))
+                    file.close()
+                    self.BigKIRefreshFolderList()
+                    self.BigKIRefreshFolderDisplay()
+                    self.BigKIRefreshContentList()
+                    self.BigKIRefreshContentListDisplay()
+                    self.editor = xMarkerEditor.GetEditor()
+        # Else if the user requested a marker game upload...
+        elif self.editor["uploading"]:
+            
+            # Initialize the Game Client.
+            if self.editor["client"] is None:
+                self.editor["client"] = msg.getGameCli().upcastToMarkerGame()
+            
+            msg = msg.upcastToGameMsg()
+            msgType = msg.getType()
+            
+            # If the message is a marker game message...
+            if msgType == PtGameCliMsgTypes.kGameCliMarkerMsg:
+                markerMsgType = msg.getMarkerMsgType()
+                msg = msg.upcastToFinalMarkerMsg()
 
-        if msgType != PtGameCliMsgTypes.kGameCliMarkerMsg:
-            return
+                # If a marker is being added...
+                if markerMsgType == PtMarkerMsgTypes.kMarkerMarkerAdded:
+                    self.editor["client"].deleteMarker(msg.markerId())
+                
+                # Else if we are creating a new game...
+                elif markerMsgType == PtMarkerMsgTypes.kMarkerTemplateCreated:
+                    self.BigKIRefreshFolderList()
+                    journal = BKJournalFolderDict[self.IGetAgeInstanceName()]
+                    markerGameNode = ptVaultMarkerGameNode()
+                    markerGameNode.setGameName(self.editor["game"]["name"])
+                    markerGameNode.setGameGuid(msg.templateID())
+                    self.editor["node"] = journal.addNode(markerGameNode).getChild().upcastToMarkerGameNode()
+                # Else if this is the last message...
+                elif markerMsgType == PtMarkerMsgTypes.kMarkerGameNameChanged:
+                    for marker in self.editor["game"]["markers"]:
+                        self.editor["client"].addMarker(marker["coords"][0], marker["coords"][1], marker["coords"][2], marker["text"], marker["age"])
+                        self.editor["uploadedGamesMarkersTotal"] += 1
+                    self.editor["node"].setGameName(self.editor["game"]["name"])
+                    self.editor["node"].save()
+                    self.IDoStatusChatMessage("Your game has been uploaded.")
+                    self.BigKIRefreshFolderList()
+                    self.BigKIRefreshFolderDisplay()
+                    self.BigKIRefreshContentList()
+                    self.BigKIRefreshContentListDisplay()
+                    self.editor = xMarkerEditor.GetEditor()
 
-        msg = msg.upcastToGameMsg()
-        msgType = msg.getMarkerMsgType()
-        finalMsg = msg.upcastToFinalMarkerMsg()
-
-        # Is a template being created?
-        if msgType == PtMarkerMsgTypes.kMarkerTemplateCreated:
-            if self.markerGameDisplay is not None:
-                self.markerGameDisplay.registerTemplateCreated(finalMsg)
-            else:
-                self.markerGameManager.registerTemplateCreated(finalMsg)
-
-        # Is a game being started?
-        elif msgType == PtMarkerMsgTypes.kMarkerGameStarted:
-            if self.markerGameDisplay is not None and self.markerGameDisplay.isMyMsg(finalMsg):
-                self.BigKICheckContentRefresh(self.BKCurrentContent)
-
-        # Is a game being paused?
-        elif msgType == PtMarkerMsgTypes.kMarkerGamePaused:
-            if self.markerGameManager.isMyMsg(finalMsg):
-                self.markerGameManager.registerPauseGame(finalMsg)
-            self.BigKICheckContentRefresh(self.BKCurrentContent)
-
-        # Is a game being reset?
-        elif msgType == PtMarkerMsgTypes.kMarkerGameReset:
-            self.markerGameManager.registerResetGame(finalMsg)
-            self.markerGameDisplay.registerResetGame(finalMsg)
-            self.BigKICheckContentRefresh(self.BKCurrentContent)
-
-        # Is a game over?
-        elif msgType == PtMarkerMsgTypes.kMarkerGameOver:
-            self.markerGameManager.registerMarkerGameOver(finalMsg)
-
-        # Is a game's name being changed?
-        elif msgType == PtMarkerMsgTypes.kMarkerGameNameChanged:
-            if self.markerGameDisplay is not None:
-                if self.markerGameDisplay.isMyMsg(finalMsg):
-                    self.markerGameDisplay.registerGameName(finalMsg)
-                return
-            self.markerGameManager.registerGameName(finalMsg)
-
-        # Is a game being deleted?
-        elif msgType == PtMarkerMsgTypes.kMarkerGameDeleted:
-            if self.markerGameDisplay is not None:
-                if self.markerGameDisplay.isMyMsg(finalMsg):
-                    self.markerGameDisplay = None
-            self.markerGameManager.registerDeleteGame(finalMsg)
-
-        # Is a marker being added?
-        elif msgType == PtMarkerMsgTypes.kMarkerMarkerAdded:
-            if self.markerGameDisplay is not None:
-                if self.markerGameDisplay.isMyMsg(finalMsg):
-                    self.markerGameDisplay.registerMarker(finalMsg)
-                    if self.pendingMGmessage is not None and self.pendingMGmessage == kMessageWait.createMarker and BigKI.dialog.isEnabled():
-                        self.pendingMGmessage = None
-                        self.SetWorkingToCurrentMarkerGame()
+        # Otherwise it's a message that should be processed normally.
+        else:
+            if msgType == PtGameCliMsgTypes.kGameCliPlayerJoinedMsg:
+                joinMsg = msg.upcastToFinalGameCliMsg()
+                if joinMsg.playerID() != PtGetLocalClientID():
                     return
-            self.pendingMGmessage = None
-            self.markerGameManager.registerMarker(finalMsg)
+                if self.markerGameDisplay is not None:
+                    self.markerGameDisplay.registerPlayerJoin(joinMsg)
+                else:
+                    self.markerGameManager.registerPlayerJoin(joinMsg)
+                return
 
-        # Is a marker being deleted?
-        elif msgType == PtMarkerMsgTypes.kMarkerMarkerDeleted:
-            if self.markerGameDisplay is not None and self.markerGameDisplay.isMyMsg(finalMsg):
-                self.markerGameDisplay.registerDeleteMarker(finalMsg)
+            if msgType != PtGameCliMsgTypes.kGameCliMarkerMsg:
+                return
+
+            msgType = msg.getType()
+            msg = msg.upcastToGameMsg()
+            msgType = msg.getMarkerMsgType()
+            finalMsg = msg.upcastToFinalMarkerMsg()
+
+            # Is a template being created?
+            if msgType == PtMarkerMsgTypes.kMarkerTemplateCreated:
+                if self.markerGameDisplay is not None:
+                    self.markerGameDisplay.registerTemplateCreated(finalMsg)
+                else:
+                    self.markerGameManager.registerTemplateCreated(finalMsg)
+
+            # Is a game being started?
+            elif msgType == PtMarkerMsgTypes.kMarkerGameStarted:
+                if self.markerGameDisplay is not None and self.markerGameDisplay.isMyMsg(finalMsg):
+                    self.BigKICheckContentRefresh(self.BKCurrentContent)
+
+            # Is a game being paused?
+            elif msgType == PtMarkerMsgTypes.kMarkerGamePaused:
+                if self.markerGameManager.isMyMsg(finalMsg):
+                    self.markerGameManager.registerPauseGame(finalMsg)
                 self.BigKICheckContentRefresh(self.BKCurrentContent)
 
-        # Is a marker's name being changed?
-        elif msgType == PtMarkerMsgTypes.kMarkerMarkerNameChanged:
-            if self.markerGameDisplay is not None and self.markerGameDisplay.isMyMsg(finalMsg):
-                self.markerGameDisplay.registerMarkerNameChanged(finalMsg)
-                if self.pendingMGmessage is not None and self.pendingMGmessage == kMessageWait.changeMarkerName:
-                    if self.MFdialogMode == kGames.MFEditingMarker:
-                        self.BigKICheckContentRefresh(self.BKCurrentContent)
-            self.pendingMGmessage = None
+            # Is a game being reset?
+            elif msgType == PtMarkerMsgTypes.kMarkerGameReset:
+                self.markerGameManager.registerResetGame(finalMsg)
+                self.markerGameDisplay.registerResetGame(finalMsg)
+                self.BigKICheckContentRefresh(self.BKCurrentContent)
 
-        # Is a marker being captured?
-        elif msgType == PtMarkerMsgTypes.kMarkerMarkerCaptured:
-            if self.markerGameDisplay is not None and self.markerGameDisplay.isMyMsg(finalMsg):
-                if self.markerGameManager.gameData.data["svrGameTemplateID"] != self.markerGameDisplay.gameData.data["svrGameTemplateID"]:
-                    self.markerGameDisplay.registerMarkerCaptured(finalMsg)
-            if self.markerGameManager.gameLoaded() and self.markerGameManager.isMyMsg(finalMsg):
-                self.markerGameManager.registerMarkerCaptured(finalMsg)
-        # Is a marker game's type being set?
-        elif msgType == PtMarkerMsgTypes.kMarkerGameType:
-            if self.markerGameDisplay is not None:
-                if self.markerGameDisplay.isMyMsg(finalMsg):
-                    self.markerGameDisplay.registerGameType(finalMsg)
-                return
-            self.markerGameManager.registerGameType(finalMsg)
+            # Is a game over?
+            elif msgType == PtMarkerMsgTypes.kMarkerGameOver:
+                self.markerGameManager.registerMarkerGameOver(finalMsg)
+
+            # Is a game's name being changed?
+            elif msgType == PtMarkerMsgTypes.kMarkerGameNameChanged:
+                if self.markerGameDisplay is not None:
+                    if self.markerGameDisplay.isMyMsg(finalMsg):
+                        self.markerGameDisplay.registerGameName(finalMsg)
+                    return
+                self.markerGameManager.registerGameName(finalMsg)
+
+            # Is a game being deleted?
+            elif msgType == PtMarkerMsgTypes.kMarkerGameDeleted:
+                if self.markerGameDisplay is not None:
+                    if self.markerGameDisplay.isMyMsg(finalMsg):
+                        self.markerGameDisplay = None
+                self.markerGameManager.registerDeleteGame(finalMsg)
+
+            # Is a marker being added?
+            elif msgType == PtMarkerMsgTypes.kMarkerMarkerAdded:
+                if self.markerGameDisplay is not None:
+                    if self.markerGameDisplay.isMyMsg(finalMsg):
+                        self.markerGameDisplay.registerMarker(finalMsg)
+                        if self.pendingMGmessage is not None and self.pendingMGmessage == kMessageWait.createMarker and BigKI.dialog.isEnabled():
+                            self.pendingMGmessage = None
+                            self.SetWorkingToCurrentMarkerGame()
+                        return
+                self.pendingMGmessage = None
+                self.markerGameManager.registerMarker(finalMsg)
+
+            # Is a marker being deleted?
+            elif msgType == PtMarkerMsgTypes.kMarkerMarkerDeleted:
+                if self.markerGameDisplay is not None and self.markerGameDisplay.isMyMsg(finalMsg):
+                    self.markerGameDisplay.registerDeleteMarker(finalMsg)
+                    self.BigKICheckContentRefresh(self.BKCurrentContent)
+
+            # Is a marker's name being changed?
+            elif msgType == PtMarkerMsgTypes.kMarkerMarkerNameChanged:
+                if self.markerGameDisplay is not None and self.markerGameDisplay.isMyMsg(finalMsg):
+                    self.markerGameDisplay.registerMarkerNameChanged(finalMsg)
+                    if self.pendingMGmessage is not None and self.pendingMGmessage == kMessageWait.changeMarkerName:
+                        if self.MFdialogMode == kGames.MFEditingMarker:
+                            self.BigKICheckContentRefresh(self.BKCurrentContent)
+                self.pendingMGmessage = None
+
+            # Is a marker being captured?
+            elif msgType == PtMarkerMsgTypes.kMarkerMarkerCaptured:
+                if self.markerGameDisplay is not None and self.markerGameDisplay.isMyMsg(finalMsg):
+                    if self.markerGameManager.gameData.data["svrGameTemplateID"] != self.markerGameDisplay.gameData.data["svrGameTemplateID"]:
+                        self.markerGameDisplay.registerMarkerCaptured(finalMsg)
+                if self.markerGameManager.gameLoaded() and self.markerGameManager.isMyMsg(finalMsg):
+                    self.markerGameManager.registerMarkerCaptured(finalMsg)
+            # Is a marker game's type being set?
+            elif msgType == PtMarkerMsgTypes.kMarkerGameType:
+                if self.markerGameDisplay is not None:
+                    if self.markerGameDisplay.isMyMsg(finalMsg):
+                        self.markerGameDisplay.registerGameType(finalMsg)
+                    return
+                self.markerGameManager.registerGameType(finalMsg)
 
     ## Called by Plasma on receipt of a backdoor message.
     # These backdoor messages can trigger various actions.
