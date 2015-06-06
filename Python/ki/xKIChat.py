@@ -1433,7 +1433,7 @@ class CommandsProcessor:
             return
 
         if not params:
-            self.chatMgr.DisplayStatusMessage("Invalid AGM command. Valid commands: l, d [id], a [id], n, +[speaker], -[speaker], c [speakers/questions].")
+            self.chatMgr.DisplayStatusMessage("Invalid AGM command. Valid commands: l, d [id], a [id], n, +[speaker], -[speaker], ls, c [speakers/queue].")
             return
 
         # Start the AGM.
@@ -1491,7 +1491,7 @@ class CommandsProcessor:
         # Add a speaker to the list.
         elif params.startswith("+"):
             if len(params) > 1:
-                playerName = params[1:]
+                playerName = params[(2 if params[1] == " " else 1):]
                 if playerName not in self.agm.speakers:
                     self.agm.speakers.append(playerName)
                     self.chatMgr.DisplayStatusMessage("Player was added to the speaker list.")
@@ -1503,7 +1503,7 @@ class CommandsProcessor:
         # Remove a speaker from the list.
         elif params.startswith("-"):
             if len(params) > 1:
-                playerName = params[1:]
+                playerName = params[(2 if params[1] == " " else 1):]
                 if playerName in self.agm.speakers:
                     self.agm.speakers.remove(playerName)
                     self.chatMgr.DisplayStatusMessage("Player was removed from the speaker list.")
@@ -1511,6 +1511,16 @@ class CommandsProcessor:
                     self.chatMgr.DisplayStatusMessage("Player isn't in the speaker list.")
             else:
                 self.chatMgr.DisplayStatusMessage("Please specify the name of the speaker.")
+
+        # List speakers.
+        elif params == "ls":
+            if self.agm.speakers:
+                agePlayers = set(player.getPlayerName() for player in self.chatMgr.BKPlayerList if isinstance(player, ptPlayer));
+                self.chatMgr.DisplayStatusMessage("-- SPEAKERS: {} total, {} present (*) --".format(len(self.agm.speakers), len(agePlayers.intersection(self.agm.speakers))))
+                for s in self.agm.speakers:
+                    self.chatMgr.DisplayStatusMessage("{} {}".format("*" if s in agePlayers else " ", s))
+            else:
+                self.chatMgr.DisplayStatusMessage("The speaker list is empty.")
 
         # Clear the question queue.
         elif params == "c queue":
@@ -1523,4 +1533,4 @@ class CommandsProcessor:
             self.chatMgr.DisplayStatusMessage("Speaker list cleared.")
 
         else:
-            self.chatMgr.DisplayStatusMessage("Invalid AGM command. Valid commands: l, d [id], a [id], n, +[speaker], -[speaker], c [speakers/questions].")
+            self.chatMgr.DisplayStatusMessage("Invalid AGM command. Valid commands: l, d [id], a [id], n, +[speaker], -[speaker], ls, c [speakers/queue].")
