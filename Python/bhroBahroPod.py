@@ -53,121 +53,63 @@ from PlasmaTypes import *
 from PlasmaKITypes import *
 from xPsnlVaultSDL import *
 
-# define the attributes that will be entered in max
-clkNegilahn             = ptAttribActivator(1, "clk: Negilahn Spiral")
-clkDereno               = ptAttribActivator(2, "clk: Dereno Spiral")
-clkPayiferen            = ptAttribActivator(3, "clk: Payiferen Spiral")
-clkTetsonot             = ptAttribActivator(4, "clk: Tetsonot Spiral")
+# Define the attributes that will be entered in Max.
+clkNegilahn = ptAttribActivator(1, "clk: Negilahn Spiral")
+clkDereno = ptAttribActivator(2, "clk: Dereno Spiral")
+clkPayiferen = ptAttribActivator(3, "clk: Payiferen Spiral")
+clkTetsonot = ptAttribActivator(4, "clk: Tetsonot Spiral")
 
-respWedges              = ptAttribResponder(5, "resp: Ground Wedges", ['Negilahn', 'Dereno', 'Payiferen', 'Tetsonot'])
-respNegilahnRing        = ptAttribResponder(6, "resp: Negilahn Floating Ring")
-respDerenoRing          = ptAttribResponder(7, "resp: Dereno Floating Ring")
-respPayiferenRing       = ptAttribResponder(8, "resp: Payiferen Floating Ring")
-respTetsonotRing        = ptAttribResponder(9, "resp: Tetsonot Floating Ring")
+respWedges = ptAttribResponder(5, "resp: Ground Wedges", ["Negilahn", "Dereno", "Payiferen", "Tetsonot"])
+respNegilahnRing = ptAttribResponder(6, "resp: Negilahn Floating Ring")
+respDerenoRing = ptAttribResponder(7, "resp: Dereno Floating Ring")
+respPayiferenRing = ptAttribResponder(8, "resp: Payiferen Floating Ring")
+respTetsonotRing = ptAttribResponder(9, "resp: Tetsonot Floating Ring")
 
-# define global variables
+kAges = {
+    clkNegilahn.id: [7, "Negilahn", respNegilahnRing],
+    clkDereno.id: [8, "Dereno", respDerenoRing],
+    clkPayiferen.id: [9, "Payiferen", respPayiferenRing],
+    clkTetsonot.id: [10, "Tetsonot", respTetsonotRing]
+}
 
-#====================================
+
 class bhroBahroPod(ptResponder):
-    ###########################
+
     def __init__(self):
         ptResponder.__init__(self)
         self.id = 8814
         self.version = 1
-        print "bhroBahroPod: init  version = %d" % self.version
+        PtDebugPrint("bhroBahroPod: v{}".format(self.version), level=kWarningLevel)
 
-    ###########################
-    def __del__(self):
-        pass
-
-    ###########################
     def OnFirstUpdate(self):
-        global gAgeStartedIn
+        PtSendKIMessage(kDisableYeeshaBook, 0)
 
-        gAgeStartedIn = PtGetAgeName()
-        PtSendKIMessage(kDisableYeeshaBook,0)
-
-    ###########################
     def OnServerInitComplete(self):
-        # if the age is not the one that I'm from then run the responder to make it back off
+        # If the age is not the one that I'm from then run the responder to make it back off
         ageFrom = PtGetPrevAgeName()
-        print "bhroBahroPod.OnServerInitComplete: Came from %s, running opposite responder state" % (ageFrom)
-        if ageFrom == "Negilahn":
-            respWedges.run(self.key, state="Dereno", fastforward=1)
-            respWedges.run(self.key, state="Payiferen", fastforward=1)
-            respWedges.run(self.key, state="Tetsonot", fastforward=1)
-
-        elif ageFrom == "Dereno":
-            respWedges.run(self.key, state="Negilahn", fastforward=1)
-            respWedges.run(self.key, state="Payiferen", fastforward=1)
-            respWedges.run(self.key, state="Tetsonot", fastforward=1)
-
-        elif ageFrom == "Payiferen":
-            respWedges.run(self.key, state="Negilahn", fastforward=1)
-            respWedges.run(self.key, state="Dereno", fastforward=1)
-            respWedges.run(self.key, state="Tetsonot", fastforward=1)
-
-        elif ageFrom == "Tetsonot":
-            respWedges.run(self.key, state="Negilahn", fastforward=1)
-            respWedges.run(self.key, state="Dereno", fastforward=1)
-            respWedges.run(self.key, state="Payiferen", fastforward=1)
+        PtDebugPrint("bhroBahroPod.OnServerInitComplete(): Came from {}, running opposite responder state.".format(ageFrom), level=kWarningLevel)
+        if ageFrom in ("Negilahn", "Dereno", "Payiferen", "Tetsonot"):
+            if ageFrom != "Negilahn":
+                respWedges.run(self.key, state="Negilahn", fastforward=1)
+            if ageFrom != "Dereno":
+                respWedges.run(self.key, state="Dereno", fastforward=1)
+            if ageFrom != "Payiferen":
+                respWedges.run(self.key, state="Payiferen", fastforward=1)
+            if ageFrom != "Tetsonot":
+                respWedges.run(self.key, state="Tetsonot", fastforward=1)
 
         psnlSDL = xPsnlVaultSDL()
-        print psnlSDL["psnlBahroWedge07"][0]
-        print psnlSDL["psnlBahroWedge08"][0]
-        print psnlSDL["psnlBahroWedge09"][0]
-        print psnlSDL["psnlBahroWedge10"][0]
+        for id, age in kAges.items():
+            if psnlSDL["psnlBahroWedge0{}".format(age[0])][0]:
+                PtDebugPrint("bhroBahroPod.OnServerInitComplete(): You have the {} wedge, no need to display it.".format(age[1]), level=kWarningLevel)
+                age[2].run(self.key, fastforward=1)
 
-        if psnlSDL["psnlBahroWedge07"][0]:
-            print "bhroBahroPod.OnServerInitComplete: You have the Negilahn wedge, no need to display it."
-            respNegilahnRing.run(self.key, fastforward=1)
-        if psnlSDL["psnlBahroWedge08"][0]:
-            print "bhroBahroPod.OnServerInitComplete: You have the Dereno wedge, no need to display it."
-            respDerenoRing.run(self.key, fastforward=1)
-        if psnlSDL["psnlBahroWedge09"][0]:
-            print "bhroBahroPod.OnServerInitComplete: You have the Payiferen wedge, no need to display it."
-            respPayiferenRing.run(self.key, fastforward=1)
-        if psnlSDL["psnlBahroWedge10"][0]:
-            print "bhroBahroPod.OnServerInitComplete: You have the Tetsonot wedge, no need to display it."
-            respTetsonotRing.run(self.key, fastforward=1)
-
-    ###########################
-    def OnNotify(self,state,id,events):
-        #print "bhroBahroPod.OnNotify: state=%s id=%d events=" % (state, id), events
-
-        if id == clkNegilahn.id and not state:
-            print "bhroBahroPod.OnNotify: clicked Negilahn Spiral"
-            respNegilahnRing.run(self.key, avatar=PtFindAvatar(events))
+    def OnNotify(self, state, id, events):
+        if id in kAges and not state:
             psnlSDL = xPsnlVaultSDL()
-            sdlVal = psnlSDL["psnlBahroWedge07"][0]
+            PtDebugPrint("bhroBahroPod.OnNotify(): Clicked {} Spiral.".format(kAges[id][1]), level=kWarningLevel)
+            kAges[id][2].run(self.key, avatar=PtFindAvatar(events))
+            sdlVal = psnlSDL["psnlBahroWedge0{}".format(kAges[id][0])][0]
             if not sdlVal:
-                print "bhroBahroPod.OnNotify:  Turning wedge SDL of psnlBahroWedge07 to On"
-                psnlSDL["psnlBahroWedge07"] = (1,)
-
-        elif id == clkDereno.id and not state:
-            print "bhroBahroPod.OnNotify: clicked Dereno Spiral"
-            respDerenoRing.run(self.key, avatar=PtFindAvatar(events))
-            psnlSDL = xPsnlVaultSDL()
-            sdlVal = psnlSDL["psnlBahroWedge08"][0]
-            if not sdlVal:
-                print "bhroBahroPod.OnNotify:  Turning wedge SDL of psnlBahroWedge08 to On"
-                psnlSDL["psnlBahroWedge08"] = (1,)
-
-        elif id == clkPayiferen.id and not state:
-            print "bhroBahroPod.OnNotify: clicked Payiferen Spiral"
-            respPayiferenRing.run(self.key, avatar=PtFindAvatar(events))
-            psnlSDL = xPsnlVaultSDL()
-            sdlVal = psnlSDL["psnlBahroWedge09"][0]
-            if not sdlVal:
-                print "bhroBahroPod.OnNotify:  Turning wedge SDL of psnlBahroWedge09 to On"
-                psnlSDL["psnlBahroWedge09"] = (1,)
-
-        elif id == clkTetsonot.id and not state:
-            print "bhroBahroPod.OnNotify: clicked Tetsonot Spiral"
-            respTetsonotRing.run(self.key, avatar=PtFindAvatar(events))
-            psnlSDL = xPsnlVaultSDL()
-            sdlVal = psnlSDL["psnlBahroWedge10"][0]
-            if not sdlVal:
-                print "bhroBahroPod.OnNotify:  Turning wedge SDL of psnlBahroWedge10 to On"
-                psnlSDL["psnlBahroWedge10"] = (1,)
-
+                PtDebugPrint("bhroBahroPod.OnNotify(): Turning {} wedge SDL to On".format(kAges[id][1]), level=kWarningLevel)
+                psnlSDL["psnlBahroWedge0{}".format(kAges[id][0])] = (1,)

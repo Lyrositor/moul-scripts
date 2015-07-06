@@ -46,10 +46,15 @@ from PlasmaTypes import *
 import math
 import random
 
+# TEMP: remove when Plasma switches to Python 3.
+import sys
+if sys.version_info[0] > 3:
+    xrange = range
+
 # define the attributes that will be entered in max
-deadZone                    = ptAttribActivator(1, "detector for dead zone")
-quabObjects                 = ptAttribSceneobjectList(2, "quab spawners")
-SDLQuabs                    = ptAttribString(3, "SDL: quabs")
+deadZone = ptAttribActivator(1, "detector for dead zone")
+quabObjects = ptAttribSceneobjectList(2, "quab spawners")
+SDLQuabs = ptAttribString(3, "SDL: quabs")
 
 # How long does it take for more quabs to be born? Eight hours, evidently...
 kQuabGestationTime = 8 * 60 * 60
@@ -61,43 +66,49 @@ kMaxNumQuabs = 20
 kQuabAvatarName = "Quab"
 
 # Silly behavior name constants
-kQuabIdleBehNames = ("Idle02", "Idle03",)
-kQuabRunBehNames  = ("Run02", "Run03",)
+kQuabIdleBehNames = ("Idle02", "Idle03")
+kQuabRunBehNames = ("Run02", "Run03")
+
 
 class ahnyQuabs(ptModifier, object):
+
     def __init__(self):
         ptModifier.__init__(self)
         self.id = 5946
         self.version = 2
+        PtDebugPrint("ahnyQuabs: v{}".format(self.version), level=kWarningLevel)
+
         self.brains = []
         random.seed()
-        print "__init__ahnyQuabs v%d " % (self.version)
 
     def _last_update_get(self):
         ageSDL = PtGetAgeSDL()
         return ageSDL[kLastQuabUpdate][0]
+
     last_update = property(_last_update_get, doc="Gets the last time a quab was killed/born")
 
     def _quabs_get(self):
         ageSDL = PtGetAgeSDL()
         return ageSDL[SDLQuabs.value][0]
+
     def _quabs_set(self, value):
         ageSDL = PtGetAgeSDL()
         ageSDL[SDLQuabs.value] = (value,)
         ageSDL[kLastQuabUpdate] = (PtGetServerTime(),)
+
     quabs = property(_quabs_get, _quabs_set, doc="Gets the number of quabs alive")
 
     def OnServerInitComplete(self):
-        PtDebugPrint("ahnyQuabs.OnServerInitComplete():\tWhen I got here...", level=kWarningLevel)
-        PtDebugPrint("ahnyQuabs.OnServerInitComplete():\t... there were already %i quabs" % self.quabs, level=kWarningLevel)
+        PtDebugPrint("ahnyQuabs.OnServerInitComplete(): When I got here...", level=kWarningLevel)
+        PtDebugPrint("ahnyQuabs.OnServerInitComplete(): ... there were already {} quabs.".format(self.quabs), level=kWarningLevel)
         self.brains = PtGetAIAvatarsByModelName(kQuabAvatarName)
 
         # Sanity Check: Before we think about doing any processing, make sure there are no quabs
         #               already loaded. We may have arrived after the last man left but before the
         #               server shut down. Therefore, we will already have quabs... So we don't want
         #               to spawn another 20 or so dupe avatar clones.
-        if len(self.brains) != 0:
-            PtDebugPrint("ahnyQuabs.OnServerInitComplete():\t... and they were already spawned!", level=kWarningLevel)
+        if self.brains:
+            PtDebugPrint("ahnyQuabs.OnServerInitComplete(): ... and they were already spawned!", level=kWarningLevel)
             for brain in self.brains:
                 self._PrepCritterBrain(brain[0])
             return
@@ -106,10 +117,10 @@ class ahnyQuabs(ptModifier, object):
             delta = PtGetServerTime() - self.last_update
             toSpawn = int(math.floor(delta / kQuabGestationTime))
             if toSpawn:
-                PtDebugPrint("ahnyQuabs.OnServerInitComplete():\t... and I need to spawn %i more" % toSpawn, level=kWarningLevel)
+                PtDebugPrint("ahnyQuabs.OnServerInitComplete(): ... and I need to spawn {} more".format(toSpawn), level=kWarningLevel)
                 self.quabs += toSpawn
             if self.quabs > kMaxNumQuabs:
-                PtDebugPrint("ahnyQuabs.OnServerInitComplete():\t... woah, %i quabs?!" % self.quabs, level=kWarningLevel)
+                PtDebugPrint("ahnyQuabs.OnServerInitComplete(): ... woah, {} quabs?!".format(self.quabs), level=kWarningLevel)
                 self.quabs = kMaxNumQuabs
 
             # Shuffle the spawn points around so we don't get the same quabs appearing
@@ -121,19 +132,19 @@ class ahnyQuabs(ptModifier, object):
             # We will load the avatar clones manually if we are the first one in.
             # We will obtain the ptCritterBrains in an OnAIMsg callback.
             for i in xrange(self.quabs):
-                PtLoadAvatarModel(kQuabAvatarName, qSpawns[i].getKey(), "Quab %i" % i)
+                PtLoadAvatarModel(kQuabAvatarName, qSpawns[i].getKey(), "Quab {}".format(i))
 
     def OnAIMsg(self, brain, msgType, userStr, args):
         if msgType == PtAIMsgType.kBrainCreated:
             # Init the brain and push it into our collection
-            PtDebugPrint("ahnyQuabs.OnAIMsg():\t%s created" % userStr, level=kDebugDumpLevel)
+            PtDebugPrint("ahnyQuabs.OnAIMsg(): {} created.".format(userStr), level=kDebugDumpLevel)
             self._PrepCritterBrain(brain)
-            self.brains.append((brain, userStr,))
+            self.brains.append((brain, userStr))
             return
 
         if msgType == PtAIMsgType.kArrivedAtGoal:
             # Not really important, but useful for debugging
-            PtDebugPrint("ahnyQuabs.OnAIMsg():\t%s arrived at goal" % userStr, level=kDebugDumpLevel)
+            PtDebugPrint("ahnyQuabs.OnAIMsg(): {} arrived at goal.".format(userStr), level=kDebugDumpLevel)
             return
 
     def OnNotify(self, state, id, events):
@@ -144,7 +155,7 @@ class ahnyQuabs(ptModifier, object):
             colso = PtFindAvatar(events)
             if colso.isAvatar() and not colso.isHuman():
                 self.quabs -= 1
-                PtDebugPrint("ahnyQuabs.OnNotify():\tQuabs remaining: %i" % self.quabs, level=kWarningLevel)
+                PtDebugPrint("ahnyQuabs.OnNotify(): Quabs remaining: {}".format(self.quabs), level=kWarningLevel)
                 return
 
     def OnUpdate(self, seconds, delta):
@@ -164,12 +175,12 @@ class ahnyQuabs(ptModifier, object):
         # ability to turn quickly (which the dog does not actually do)...
         # This evolutionary biology lesson is thanks to Hoikas, the Mammalogy drop-out
         monsters = brain.playersICanHear()
-        if len(monsters) == 0:
+        if not monsters:
             if running:
-                PtDebugPrint("ahnyQuabs._Think():\t%s is now safe." % name, level=kDebugDumpLevel)
+                PtDebugPrint("ahnyQuabs._Think(): {} is now safe.".format(name), level=kDebugDumpLevel)
                 self._RunAway(brain, False)
             return
-        runaway  = None
+        runaway = None
         for monster in monsters:
             vec = brain.vectorToPlayer(monster)
             vec.normalize()
@@ -177,7 +188,7 @@ class ahnyQuabs(ptModifier, object):
                 runaway = runaway.add(vec)
             else:
                 runaway = vec
-        runaway = runaway.scale(100) # so we don't just move a centimeter away
+        runaway = runaway.scale(100)  # So we don't just move a centimeter away
         curPos = brain.getSceneObject().position()
         endPos = ptPoint3(curPos.getX() + runaway.getX(), curPos.getY() + runaway.getY(), curPos.getZ() + runaway.getZ())
 
@@ -185,7 +196,7 @@ class ahnyQuabs(ptModifier, object):
         if not running:
             # Note: low level brain will make the quab play the run behavior
             #       no need to court a race condition by playing it here
-            PtDebugPrint("ahnyQuabs._Think():\tTime for %s to run away!" % name, level=kDebugDumpLevel)
+            PtDebugPrint("ahnyQuabs._Think(): Time for {} to run away!".format(name), level=kDebugDumpLevel)
         brain.goToGoal(endPos)
 
     def _PrepCritterBrain(self, brain):

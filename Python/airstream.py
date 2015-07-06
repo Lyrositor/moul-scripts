@@ -44,28 +44,21 @@ You can contact Cyan Worlds, Inc. by email legal@cyan.com
 
 from Plasma import *
 from PlasmaTypes import *
-import PlasmaControlKeys
 
-activateAirstream = ptAttribActivator(1,"airstream activator")
-airstreamNode = ptAttribSceneobject(2,"airstream attach node")
+activateAirstream = ptAttribActivator(1, "airstream activator")
+airstreamNode = ptAttribSceneobject(2, "airstream attach node")
+
 
 class airstream(ptResponder):
 
     def __init__(self):
-        # run parent class init
         ptResponder.__init__(self)
         self.id = 50439
         self.version = 1
-        
-        print "__init__airstream v."
-
+        PtDebugPrint("airstream: v{}".format(self.version), level=kWarningLevel)
                         
-    def OnNotify(self,state,id,events):
-
-        if id==activateAirstream.id:
+    def OnNotify(self, state, id, events):
+        if id == activateAirstream.id:
             avatar = PtFindAvatar(events)
             avatar.draw.disable()
-#            avatar.physics.warpObj(airstreamNode.value.getKey())
-#            PtAttachObject(avatar.getKey(), airstreamNode.value.getKey())
             avatar.physics.enable(0)
- 

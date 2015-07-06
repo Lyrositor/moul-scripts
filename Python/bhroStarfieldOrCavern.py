@@ -54,37 +54,28 @@ from xPsnlVaultSDL import *
 
 boolCavernObj = ptAttribBoolean(1, "Cavern object", 0)
 
+
 class bhroStarfieldOrCavern(ptMultiModifier):
 
     def __init__(self):
         ptModifier.__init__(self)
         self.id = 5318
         self.version = 1
-        PtDebugPrint("__init__bhroStarfieldOrCavern v. %d" % (self.version))
+        PtDebugPrint("bhroStarfieldOrCavern: v{}".format(self.version), level=kWarningLevel)
 
     def OnServerInitComplete(self):
         sdl = xPsnlVaultSDL()
 
         if sdl["TeledahnPoleState"][0] > 5 or sdl["KadishPoleState"][0] > 5 or sdl["GardenPoleState"][0] > 5 or sdl["GarrisonPoleState"][0] > 5:
-            # we want to draw the cavern
-            if boolCavernObj.value:
-                #self.EnableObject()
-                pass
-            else:
+            # We want to draw the cavern
+            if not boolCavernObj.value:
                 self.DisableObject()
         else:
-            # we want to draw the starfield
+            # We want to draw the starfield
             if boolCavernObj.value:
                 self.DisableObject()
-            else:
-                #self.EnableObject()
-                pass
-
-    def EnableObject(self):
-        self.sceneobject.draw.enable()
-        self.sceneobject.physics.suppress(false)
 
     def DisableObject(self):
         self.sceneobject.draw.disable()
-        self.sceneobject.physics.suppress(true)
+        self.sceneobject.physics.suppress(True)
         self.sceneobject.particle.setParticlesPerSecond(0)

@@ -49,18 +49,11 @@ Date: June 2003
 from Plasma import *
 from PlasmaTypes import *
 
+
 class BahroCave(ptResponder):
 
     def __init__(self):
         ptResponder.__init__(self)
         self.id = 5314
         self.version = 1
-
-    def OnFirstUpdate(self):
-        pass
-        
-    def Load(self):
-        pass        
-        
-    def OnNotify(self,state,id,events):
-        pass
+        PtDebugPrint("BahroCave: v{}".format(self.version), level=kWarningLevel)

@@ -53,40 +53,29 @@ from PlasmaTypes import *
 from PlasmaKITypes import *
 from xPsnlVaultSDL import *
 
-# define the attributes that will be entered in max
-clkBSTsogal             = ptAttribActivator(1, "clk: Tsogal Blue Spiral")
-clkBSDelin              = ptAttribActivator(2, "clk: Delin Blue Spiral")
+# Define the attributes that will be entered in Max.
+clkBSTsogal = ptAttribActivator(1, "clk: Tsogal Blue Spiral")
+clkBSDelin = ptAttribActivator(2, "clk: Delin Blue Spiral")
 
-respWedges              = ptAttribResponder(3, "resp: Ground Wedges", ['Delin', 'Tsogal'])
-respRings               = ptAttribResponder(4, "resp: Floating Rings", ['Delin', 'Tsogal'])
+respWedges = ptAttribResponder(3, "resp: Ground Wedges", ["Delin", "Tsogal"])
+respRings = ptAttribResponder(4, "resp: Floating Rings", ["Delin", "Tsogal"])
 
-# define global variables
 
-#====================================
 class bhroBahroBlueSpiral(ptResponder):
-    ###########################
+
     def __init__(self):
         ptResponder.__init__(self)
         self.id = 8813
         self.version = 1
-        print "bhroBahroBlueSpiral: init  version = %d" % self.version
+        PtDebugPrint("bhroBahroBlueSpiral: v{}".format(self.version), level=kWarningLevel)
 
-    ###########################
-    def __del__(self):
-        pass
-
-    ###########################
     def OnFirstUpdate(self):
-        global gAgeStartedIn
+        PtSendKIMessage(kDisableYeeshaBook, 0)
 
-        gAgeStartedIn = PtGetAgeName()
-        PtSendKIMessage(kDisableYeeshaBook,0)
-
-    ###########################
     def OnServerInitComplete(self):
-        # if the age is not the one that I'm from then run the responder to make it back off
+        # If the age is not the one that I'm from then run the responder to make it back off
         ageFrom = PtGetPrevAgeName()
-        print "bhroBahroBlueSpiral.OnServerInitComplete: Came from %s, running opposite responder state" % (ageFrom)
+        PtDebugPrint("bhroBahroBlueSpiral.OnServerInitComplete(): Came from {}, running opposite responder state.".format(ageFrom), level=kWarningLevel)
         if ageFrom == "EderTsogal":
             respWedges.run(self.key, state="Delin", fastforward=1)
 
@@ -99,25 +88,21 @@ class bhroBahroBlueSpiral(ptResponder):
         if psnlSDL["psnlBahroWedge06"][0]:
             respRings.run(self.key, state="Tsogal", fastforward=1)
 
-    ###########################
-    def OnNotify(self,state,id,events):
-        #print "bhroBahroBlueSpiral.OnNotify: state=%s id=%d events=" % (state, id), events
-
+    def OnNotify(self, state, id, events):
         if id == clkBSTsogal.id and not state:
-            print "bhroBahroBlueSpiral.OnNotify: clicked Tsogal Spiral"
+            PtDebugPrint("bhroBahroBlueSpiral.OnNotify(): Clicked Tsogal Spiral.", level=kWarningLevel)
             respRings.run(self.key, state="Tsogal", avatar=PtFindAvatar(events))
             psnlSDL = xPsnlVaultSDL()
             sdlVal = psnlSDL["psnlBahroWedge06"][0]
             if not sdlVal:
-                print "bhroBahroBlueSpiral.OnNotify:  Tturning wedge SDL of psnlBahroWedge06 to On"
+                PtDebugPrint("bhroBahroBlueSpiral.OnNotify(): Turning wedge SDL of psnlBahroWedge06 to On.", level=kDebugDumpLevel)
                 psnlSDL["psnlBahroWedge06"] = (1,)
 
         elif id == clkBSDelin.id and not state:
-            print "bhroBahroBlueSpiral.OnNotify: clicked Delin Spiral"
+            PtDebugPrint("bhroBahroBlueSpiral.OnNotify(): Clicked Delin Spiral", level=kWarningLevel)
             respRings.run(self.key, state="Delin", avatar=PtFindAvatar(events))
             psnlSDL = xPsnlVaultSDL()
             sdlVal = psnlSDL["psnlBahroWedge05"][0]
             if not sdlVal:
-                print "bhroBahroBlueSpiral.OnNotify:  Tturning wedge SDL of psnlBahroWedge05 to On"
+                PtDebugPrint("bhroBahroBlueSpiral.OnNotify(): Turning wedge SDL of psnlBahroWedge05 to On.", level=kDebugDumpLevel)
                 psnlSDL["psnlBahroWedge05"] = (1,)
-

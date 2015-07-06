@@ -50,6 +50,7 @@ Author: Adam Van Ornum (based on original work by Chris Purvis)
 from Plasma import *
 from PlasmaTypes import *
 
+# Define the attributes that will be entered in Max.
 GroupSelector = ptAttribDropDownList(1, "Group Selector", ("Hub", "Eng Hut", "Vogondola", "Vogondola Throttle", "Vogondola Reverse", "Call buttons") )
 
 actHubChairClick = ptAttribActivator(2, "Hub chair clickable")
@@ -92,11 +93,6 @@ respVogRideStart = ptAttribResponder(30, "Vog ride start resp")
 respVogRideStop = ptAttribResponder(31, "Vog ride stop resp")
 respVogRideStartRev = ptAttribResponder(32, "Vog ride start rev resp")
 respVogRideStopRev = ptAttribResponder(33, "Vog ride stop rev resp")
-
-##actCallbuttonHub = ptAttribNamedActivator(34, "Hub vog call button")
-##actCallbuttonEngHut = ptAttribNamedActivator(35, "Eng hut vog call button")
-##respHubCallbutton = ptAttribNamedResponder(36, "Hub call button resp")
-##respEngHutCallbutton = ptAttribNamedResponder(37, "Eng hut call button resp")
 
 respVogRideReset = ptAttribResponder(38, "Vog ride reset resp", ["hub", "eng hut"])
 
@@ -166,10 +162,13 @@ respSounds.setVisInfo(1, ["Vogondola"])
 actStopVogSoundForward.setVisInfo(1, ["Vogondola"])
 actStopVogSoundBackward.setVisInfo(1, ["Vogondola"])
 
-def DisableVogControls( enabledControlList ):
-    disableControlList = [actVogEjectFront, actVogEjectRear, actVogThrottleF, actVogThrottleB, actVogThrottleRevF, actVogThrottleRevB, actVogDirection, actVogDirectionRev]
+def DisableVogControls(enabledControlList):
+    disableControlList = [
+        actVogEjectFront, actVogEjectRear, actVogThrottleF, actVogThrottleB,
+        actVogThrottleRevF, actVogThrottleRevB, actVogDirection, actVogDirectionRev
+    ]
 
-    if type(enabledControlList) == type( [] ):
+    if isinstance(enabledControlList, list):
         for control in enabledControlList:
             disableControlList.remove(control)
             control.enable()
@@ -177,50 +176,47 @@ def DisableVogControls( enabledControlList ):
     for control in disableControlList:
         control.disable()
 
-def VogondolaIsOccupied( occupant ):
+def VogondolaIsOccupied(occupant):
     if occupant:
-        print "ahnyVogondolaRideV2.VogondolaIsOccupied(): Someone got in the Vog, disabling all access points"
+        PtDebugPrint("ahnyVogondolaRideV2.VogondolaIsOccupied(): Someone got in the Vog, disabling all access points.", level=kDebugDumpLevel)
         
         actHubChairClick.disable()
         actEngHutChairClick.disable()
         actCallbuttonHub.disable()
         actCallbuttonEngHut.disable()
     else:
-        print "ahnyVogondolaRideV2.VogondolaIsOccupied(): Someone got out of the Vog, enabling all access points"
+        PtDebugPrint("ahnyVogondolaRideV2.VogondolaIsOccupied(): Someone got out of the Vog, enabling all access points.", level=kDebugDumpLevel)
         
         sdl = PtGetAgeSDL()
         vogLoc = sdl["ahnyVogLocation"][0]
         if vogLoc == 0:
-            print "SDL set to 0, Hub Chair enabled"
+            PtDebugPrint("ahnyVogondolaRideV2.VogondolaIsOccupied(): SDL set to 0, Hub Chair enabled", level=kDebugDumpLevel)
             actHubChairClick.enable()
         elif vogLoc == 2:
-            print "SDL set to 2, Hut Chair enabled"
+            PtDebugPrint("ahnyVogondolaRideV2.VogondolaIsOccupied(): SDL set to 2, Hut Chair enabled.", level=kDebugDumpLevel)
             actEngHutChairClick.enable()
 
-# brains - these determine what happens at the various stages
-class InHubBrain:
-    def __init__(self, parent):
-        self.parent = parent
-        self.name = "In Hub Brain"
 
-        print "initing", self.name
+# Brains - these determine what happens at the various stages
+class InHubBrain(object):
+
+    def __init__(self, parent):
+        PtDebugPrint("InHubBrain: Initializing.", level=kWarningLevel)
+        self.parent = parent
 
         PtDisableMovementKeys()
 
         enabledControlList = [actVogEjectFront, actVogEjectRear, actVogThrottleB]
-
         if self.parent.direction == 1:
             enabledControlList.append(actVogDirection)
         elif self.parent.direction == -1:
             enabledControlList.append(actVogDirectionRev)
-
-        DisableVogControls( enabledControlList )
+        DisableVogControls(enabledControlList)
 
     def OnNotify(self, state, id, events):
         if id == actHubChairClick.id and state:
-            print "Hub Brain says Hub Chair clicked, disable Hub Chair"
+            PtDebugPrint("InHubBrain: Hub Chair clicked, disable Hub Chair.", level=kDebugDumpLevel)
             actHubChairClick.disable()
-
             avatar = PtFindAvatar(events)
             behHubChairClimb.run(avatar)
 
@@ -228,94 +224,84 @@ class InHubBrain:
             for event in events:
                 if event[0] == kMultiStageEvent and event[1] == 0 and event[2] == kEnterStage:
                     respHubChairLower.run(self.parent.key, events = events, state = "lower")
-                    print self.name + ": finished smart-seek"
-                    
+                    PtDebugPrint("InHubBrain.OnNotify(): Finished smart-seek.", level=kDebugDumpLevel)
+
                 elif event[0] == kMultiStageEvent and event[1] == 0 and event[2] == kAdvanceNextStage:
                     theAvatar = PtGetLocalAvatar()
                     theAvatar.avatar.enterSubWorld(soVogSubworld.value)
                     theAvatar.physics.warpObj(soVogDummy.value.getKey())
-                    print self.name + ": pinned avatar"
-                    respVogChairLower.run(self.parent.key, events = events)
-                    
+                    PtDebugPrint("InHubBrain.OnNotify(): Pinned avatar.", level=kDebugDumpLevel)
+                    respVogChairLower.run(self.parent.key, events=events)
+
         elif id == actVogDirection.id and state:
             actVogDirection.disable()
             actVogThrottleB.disable()
             self.parent.direction = -1
-            respVogRotate.run(self.parent.key, state = "back")
+            respVogRotate.run(self.parent.key, state="back")
             actVogDirectionRev.enable()
 
         elif id == actVogDirectionRev.id and state:
             actVogDirectionRev.disable()
             self.parent.direction = 1
-            respVogRotate.run(self.parent.key, state = "front")
+            respVogRotate.run(self.parent.key, state="front")
             actVogThrottleB.enable()
             actVogDirection.enable()
 
         elif id == actVogEjectFront.id and state:
-            DisableVogControls( None )
-            respVogEjectHub.run(self.parent.key, state = "norotate")
-
+            DisableVogControls(None)
+            respVogEjectHub.run(self.parent.key, state="norotate")
             sdl = PtGetAgeSDL()
-            print "SETTING SDL TO 0"
             sdl["ahnyVogLocation"] = (0,)
 
         elif id == actVogEjectRear.id and state:
-            DisableVogControls( None )
-            respVogEjectHub.run(self.parent.key, state = "rotate")
-
+            DisableVogControls(None)
+            respVogEjectHub.run(self.parent.key, state="rotate")
             sdl = PtGetAgeSDL()
-            print "SETTING SDL TO 0"
             sdl["ahnyVogLocation"] = (0,)
 
         elif id == actVogThrottleB.id and state:
-            DisableVogControls( None )
+            DisableVogControls(None)
             respVogRideStart.run(self.parent.key)
 
         elif id == respVogRideStart.id:
-            print "running respSounds: state - hubtubeout loc - hub brain respvogridestart"
-            respSounds.run(self.parent.key, state = "hubtubeout")
+            PtDebugPrint("InHubBrain.OnNotify(): Running respSounds: state - hubtubeout loc - hub brain respvogridestart.", level=kDebugDumpLevel)
+            respSounds.run(self.parent.key, state="hubtubeout")
 
         elif id == actTubeEndFromHub.id:
-            #respVogThrottle.run(self.parent.key, state = "stop")
             respVogRideStop.run(self.parent.key)
-
             self.parent.currentBrain = HubSailTubeTransitionBrain(self.parent)
             self.parent.direction = 1
 
         elif id == respVogEjectHub.id:
-            theAvatar=PtGetLocalAvatar()
-            respHubChairLower.run(self.parent.key, avatar = theAvatar, state = "raise")
+            theAvatar = PtGetLocalAvatar()
+            respHubChairLower.run(self.parent.key, avatar=theAvatar, state="raise")
             theAvatar.avatar.exitSubWorld()
             theAvatar.physics.warpObj(soEjectPointHub.value.getKey())
-            respVogEjectHub.run(self.parent.key, avatar = theAvatar, state = "oneshot")
+            respVogEjectHub.run(self.parent.key, avatar=theAvatar, state="oneshot")
 
             self.parent.currentBrain = None
             PtEnableMovementKeys()
-            print "ejecting finished in vog at hub...setting current brain to none"
+            PtDebugPrint("InHubBrain.OnNotify(): Ejecting finished in vog at hub... setting current brain to None.", level=kDebugDumpLevel)
 
-class HubSailTubeTransitionBrain:
+class HubSailTubeTransitionBrain(object):
+
     def __init__(self, parent):
+        PtDebugPrint("HubSailTubeTransitionBrain: Initializing.", level=kWarningLevel)
         self.parent = parent
-        self.name = "Hub Sail Tube Transition Brain"
-
-        print "initing", self.name
-
 
         enabledControlList = [actVogThrottleB, actVogThrottleRevB]
-
         if self.parent.direction == 1:
             enabledControlList.append(actVogDirection)
         elif self.parent.direction == -1:
             enabledControlList.append(actVogDirectionRev)
-
-        DisableVogControls( enabledControlList )
+        DisableVogControls(enabledControlList)
 
     def OnNotify(self, state, id, events):
         if id == actVogDirection.id and state:
             actVogDirection.disable()
             actVogThrottleB.disable()
             self.parent.direction = -1
-            respVogRotate.run(self.parent.key, state = "back")
+            respVogRotate.run(self.parent.key, state="back")
             actVogThrottleRevB.enable()
             actVogDirectionRev.enable()
 
@@ -323,73 +309,59 @@ class HubSailTubeTransitionBrain:
             actVogDirectionRev.disable()
             actVogThrottleRevB.disable()
             self.parent.direction = 1
-            respVogRotate.run(self.parent.key, state = "front")
+            respVogRotate.run(self.parent.key, state="front")
             actVogThrottleB.enable()
             actVogDirection.enable()
 
         elif id == actVogThrottleB.id and state:
-            #DisableVogControls()
             respVogRideStart.run(self.parent.key)
-            #respSounds.run(self.parent.key, state = "sailtohut")
-
             self.parent.currentBrain = SailingBrain(self.parent)
             self.parent.direction = 1
 
         elif id == actVogThrottleRevB.id and state:
-            DisableVogControls( None )
+            DisableVogControls(None)
             respVogRideStartRev.run(self.parent.key)
 
         elif id == respVogRideStartRev.id:
-            print "running respSounds: state - hubtubein loc - hubtransistion respvogridestartrev"
-            respSounds.run(self.parent.key, state = "hubtubein")
-
-        #elif (id == respVogRideStop.id or id == respVogRideStopRev.id) and self.parent.direction == -1:
-        #    respSounds.run(self.parent.key, state = "stop")
+            PtDebugPrint("HubSailTubeTransitionBrain.OnNotify(): Running respSounds: state - hubtubein loc - hubtransistion respvogridestartrev.", level=kDebugDumpLevel)
+            respSounds.run(self.parent.key, state="hubtubein")
 
         elif id == actHubRideEnd.id:
-            #DisableVogControls()
-            respVogThrottle.run(self.parent.key, state = "stop")
-
+            respVogThrottle.run(self.parent.key, state="stop")
             self.parent.currentBrain = InHubBrain(self.parent)
 
-class SailingBrain:
+class SailingBrain(object):
     def __init__(self, parent):
+        PtDebugPrint("SailingBrain: Initializing.", level=kWarningLevel)
         self.parent = parent
-        self.name = "Sailing Brain"
-
-        print "initing", self.name
 
         enabledControlList = None
-
         if self.parent.direction == 1:
             enabledControlList = [actVogThrottleF]
         elif self.parent.direction == -1:
             enabledControlList = [actVogThrottleRevF]
-
-        DisableVogControls( enabledControlList )
+        DisableVogControls(enabledControlList)
 
     def OnNotify(self, state, id, events):
         if (id == actVogThrottleF.id or id == actVogThrottleRevF.id) and state:
             respVogRideStop.run(self.parent.key)
 
             enabledControlList = None
-            
             if self.parent.direction == 1:
                 enabledControlList = [actVogThrottleB, actVogDirection]
             elif self.parent.direction == -1:
                 enabledControlList = [actVogThrottleRevB, actVogDirectionRev]
-
-            DisableVogControls( enabledControlList )
+            DisableVogControls(enabledControlList)
 
         elif id == respVogRideStop.id or id == respVogRideStopRev.id:
-            print "vog ride stop notify"
-            respSounds.run(self.parent.key, state = "stop")
+            PtDebugPrint("SailingBrain.OnNotify(): vog ride stop notify.", level=kDebugDumpLevel)
+            respSounds.run(self.parent.key, state="stop")
 
         elif id == actVogDirection.id and state:
             actVogDirection.disable()
             actVogThrottleB.disable()
             self.parent.direction = -1
-            respVogRotate.run(self.parent.key, state = "back")
+            respVogRotate.run(self.parent.key, state="back")
             actVogThrottleRevB.enable()
             actVogDirectionRev.enable()
 
@@ -397,64 +369,52 @@ class SailingBrain:
             actVogDirectionRev.disable()
             actVogThrottleRevB.disable()
             self.parent.direction = 1
-            respVogRotate.run(self.parent.key, state = "front")
+            respVogRotate.run(self.parent.key, state="front")
             actVogThrottleB.enable()
             actVogDirection.enable()
 
         elif id == actVogThrottleB.id and state:
-            DisableVogControls( [actVogThrottleF] )
+            DisableVogControls([actVogThrottleF])
             respVogRideStart.run(self.parent.key)
-            #respSounds.run(self.parent.key, state = "sailtohut")
 
         elif id == actVogThrottleRevB.id and state:
-            DisableVogControls( [actVogThrottleRevF] )
+            DisableVogControls([actVogThrottleRevF])
             respVogRideStartRev.run(self.parent.key)
-            #respSounds.run(self.parent.key, state = "sailtohub")
 
         elif id == respVogRideStart.id:
-            print "running respSounds: state - sailtohut loc - sail brain vogridestart"
-            respSounds.run(self.parent.key, state = "sailtohut")
+            PtDebugPrint("SailingBrain.OnNotify(): Running respSounds: state - sailtohut loc - sail brain vogridestart.", level=kDebugDumpLevel)
+            respSounds.run(self.parent.key, state="sailtohut")
 
         elif id == respVogRideStartRev.id:
-            print "running respSounds: state - sailtohub loc - sail brain vogridestartrev"
-            respSounds.run(self.parent.key, state = "sailtohub")
+            PtDebugPrint("SailingBrain.OnNotify(): Running respSounds: state - sailtohub loc - sail brain vogridestartrev.", level=kDebugDumpLevel)
+            respSounds.run(self.parent.key, state="sailtohub")
 
         elif id == actSailEndToEngHut.id and self.parent.direction == 1:
-            #DisableVogControls()
             respVogRideStop.run(self.parent.key)
-            #respSounds.run(self.parent.key, state = "stop")
-
             self.parent.currentBrain = EngHutSailTubeTransitionBrain(self.parent)
 
         elif id == actSailEndToHub.id and self.parent.direction == -1:
-            #DisableVogControls()
             respVogRideStop.run(self.parent.key)
-            #respSounds.run(self.parent.key, state = "stop")
-
             self.parent.currentBrain = HubSailTubeTransitionBrain(self.parent)
         
-class EngHutSailTubeTransitionBrain:
+class EngHutSailTubeTransitionBrain(object):
     def __init__(self, parent):
+        PtDebugPrint("EngHutSailTubeTransitionBrain: Initializing.", level=kWarningLevel)
         self.parent = parent
-        self.name = "Eng Hut Sail Tube Transition Brain"
-
-        print "initing", self.name
 
         enabledControlList = [actVogThrottleB, actVogThrottleRevB]
-
         if self.parent.direction == 1:
             enabledControlList.append(actVogDirection)
         elif self.parent.direction == -1:
             enabledControlList.append(actVogDirectionRev)
-
-        DisableVogControls( enabledControlList )
+        DisableVogControls(enabledControlList)
 
     def OnNotify(self, state, id, events):
         if id == actVogDirection.id and state:
             actVogDirection.disable()
             actVogThrottleB.disable()
             self.parent.direction = -1
-            respVogRotate.run(self.parent.key, state = "back")
+            respVogRotate.run(self.parent.key, state="back")
             actVogThrottleRevB.enable()
             actVogDirectionRev.enable()
 
@@ -462,78 +422,66 @@ class EngHutSailTubeTransitionBrain:
             actVogDirectionRev.disable()
             actVogThrottleRevB.disable()
             self.parent.direction = 1
-            respVogRotate.run(self.parent.key, state = "front")
+            respVogRotate.run(self.parent.key, state="front")
             actVogThrottleB.enable()
             actVogDirection.enable()
 
         elif id == actVogThrottleRevB.id and state:
-            #DisableVogControls()
             respVogRideStartRev.run(self.parent.key)
-            #respSounds.run(self.parent.key, state = "sailtohub")
-
             self.parent.currentBrain = SailingBrain(self.parent)
             self.parent.direction = -1
 
-        #elif (id == respVogRideStop.id or id == respVogRideStopRev.id) and self.parent.direction == 1:
-        #    respSounds.run(self.parent.key, state = "stop")
-
         elif id == actVogThrottleB.id and state:
-            DisableVogControls( None )
+            DisableVogControls(None)
             respVogRideStart.run(self.parent.key)
 
         elif id == respVogRideStart.id:
-            print "running respSounds: state - huttubein loc - hut transition vogridestart"
-            respSounds.run(self.parent.key, state = "huttubein")
+            PtDebugPrint("EngHutSailTubeTransitionBrain.OnNotify(): Running respSounds: state - huttubein loc - hut transition vogridestart.", level=kDebugDumpLevel)
+            respSounds.run(self.parent.key, state="huttubein")
 
         elif id == actEngHutRideEnd.id:
-            #DisableVogControls()
-            respVogThrottle.run(self.parent.key, state = "stop")
-
+            respVogThrottle.run(self.parent.key, state="stop")
             self.parent.currentBrain = InEngHutBrain(self.parent)
 
-class InEngHutBrain:
-    def __init__(self, parent):
-        self.parent = parent
-        self.name = "In Eng Hut Brain"
+class InEngHutBrain(object):
 
-        print "initing", self.name
+    def __init__(self, parent):
+        PtDebugPrint("InEngHutBrain: Initializing.", level=kWarningLevel)
+        self.parent = parent
 
         PtDisableMovementKeys()
 
         enabledControlList = [actVogEjectFront, actVogEjectRear, actVogThrottleRevB]
-        
         if self.parent.direction == 1:
             enabledControlList.append(actVogDirection)
         elif self.parent.direction == -1:
             enabledControlList.append(actVogDirectionRev)
-
-        DisableVogControls( enabledControlList )
+        DisableVogControls(enabledControlList)
 
     def OnNotify(self, state, id, events):
         if id == actEngHutChairClick.id and state:
-            print "Hut Brain says Hut Chair clicked, disable Hut Chair"
+            PtDebugPrint("InEngHutBrain.OnNotify(): Hut Brain says Hut Chair clicked, disable Hut Chair.", level=kDebugDumpLevel)
             actEngHutChairClick.disable()
-
             avatar = PtFindAvatar(events)
             behEngHutChairClimb.run(avatar)
 
         elif id == behEngHutChairClimb.id:
             for event in events:
                 if event[0] == kMultiStageEvent and event[1] == 0 and event[2] == kEnterStage:
-                    respEngHutChairLower.run(self.parent.key, events = events, state = "lower")
-                    print self.name + ": finished smart-seek"
+                    respEngHutChairLower.run(self.parent.key, events=events, state="lower")
+                    PtDebugPrint("InEngHutBrain.OnNotify(): Finished smart-seek.", level=kDebugDumpLevel)
                     
                 elif event[0] == kMultiStageEvent and event[1] == 0 and event[2] == kAdvanceNextStage:
                     theAvatar = PtGetLocalAvatar()
                     theAvatar.avatar.enterSubWorld(soVogSubworld.value)
                     theAvatar.physics.warpObj(soVogDummy.value.getKey())
-                    print self.name + ": pinned avatar"
-                    respVogChairLower.run(self.parent.key, events = events)
+                    PtDebugPrint("InEngHutBrain.OnNotify(): Pinned avatar.", level=kDebugDumpLevel)
+                    respVogChairLower.run(self.parent.key, events=events)
                     
         elif id == actVogDirection.id and state:
             actVogDirection.disable()
             self.parent.direction = -1
-            respVogRotate.run(self.parent.key, state = "back")
+            respVogRotate.run(self.parent.key, state="back")
             actVogThrottleRevB.enable()
             actVogDirectionRev.enable()
 
@@ -541,75 +489,66 @@ class InEngHutBrain:
             actVogDirectionRev.disable()
             actVogThrottleRevB.disable()
             self.parent.direction = 1
-            respVogRotate.run(self.parent.key, state = "front")
+            respVogRotate.run(self.parent.key, state="front")
             actVogDirection.enable()
 
         elif id == actVogEjectFront.id and state:
-            DisableVogControls( None )
-            respVogEjectEngHut.run(self.parent.key, state = "norotate")
-            theAvatar = PtGetLocalAvatar()
-            #theAvatar.draw.disable()
-            
+            DisableVogControls(None)
+            respVogEjectEngHut.run(self.parent.key, state="norotate")
             sdl = PtGetAgeSDL()
-            print "SETTING SDL TO 2"
             sdl["ahnyVogLocation"] = (2,)
 
         elif id == actVogEjectRear.id and state:
-            DisableVogControls( None )
-            respVogEjectEngHut.run(self.parent.key, state = "rotate")
-
+            DisableVogControls(None)
+            respVogEjectEngHut.run(self.parent.key, state="rotate")
             sdl = PtGetAgeSDL()
-            print "SETTING SDL TO 2"
             sdl["ahnyVogLocation"] = (2,)
 
         elif id == actVogThrottleRevB.id and state:
-            DisableVogControls( None )
+            DisableVogControls(None)
             respVogRideStartRev.run(self.parent.key)
-            #respSounds.run(self.parent.key, state = "huttubeout")
 
         elif id == respVogRideStartRev.id:
-            print "running respSounds: huttubeout - stop loc - hut brain vogridestartrev"
-            respSounds.run(self.parent.key, state = "huttubeout")
+            PtDebugPrint("InEngHutBrain.OnNotify(): Running respSounds: huttubeout - stop loc - hut brain vogridestartrev.", level=kDebugDumpLevel)
+            respSounds.run(self.parent.key, state="huttubeout")
 
         elif id == actTubeEndFromEngHut.id:
             respVogRideStop.run(self.parent.key)
-
             self.parent.currentBrain = EngHutSailTubeTransitionBrain(self.parent)
             self.parent.direction = -1
 
         elif id == respVogEjectEngHut.id:
-            theAvatar=PtGetLocalAvatar()
-            respEngHutChairLower.run(self.parent.key, avatar = theAvatar, state = "raise")
+            theAvatar = PtGetLocalAvatar()
+            respEngHutChairLower.run(self.parent.key, avatar=theAvatar, state="raise")
             theAvatar.avatar.exitSubWorld()
             theAvatar.physics.warpObj(soEjectPointEngHut.value.getKey())
-            respVogEjectEngHut.run(self.parent.key, avatar = theAvatar, state = "oneshot")
+            respVogEjectEngHut.run(self.parent.key, avatar=theAvatar, state="oneshot")
 
             self.parent.currentBrain = None
             PtEnableMovementKeys()
-            #theAvatar.draw.enable()
-            print "ejecting finished in vog at eng hut...setting current brain to none"
+            PtDebugPrint("InEngHutBrain.OnNotify(): Ejecting finished in vog at eng hut... setting current brain to None.", level=kDebugDumpLevel)
 
 
-# main class
+# Main class
 class ahnyVogondolaRideV2(ptResponder):
 
     def __init__(self):
         ptResponder.__init__(self)
         self.id = 5338
         self.version = 2
+        PtDebugPrint("ahnyVogondolaRideV2: v{}".format(self.version), level=kWarningLevel)
+
         self.currentBrain = None
         self.direction = 1
         self.throttle = 0
         self.occupant = None
-        print "Init: ahnyVogondolaRideV2"
 
     def OnFirstUpdate(self):
         try:
             ageSDL = PtGetAgeSDL()
         except:
-            print "uh oh... no SDL! Prepare to have lots of bugs."
+            PtDebugPrint("ahnyVogondolaRideV2.OnFirstUpdate(): Cannot find the Ahnonay Age SDL.", level=kErrorLevel)
 
-        ageSDL = PtGetAgeSDL()
         ageSDL.setFlags("ahnyVogLocation",1,1)
         ageSDL.sendToClients("ahnyVogLocation")
         ageSDL.setNotify(self.key,"ahnyVogLocation",0.0)
@@ -618,17 +557,17 @@ class ahnyVogondolaRideV2(ptResponder):
         ageSDL.sendToClients("ahnyVogOccupant")
         ageSDL.setNotify(self.key,"ahnyVogOccupant",0.0)
         
-        print "First Update, all buttons disabled"
+        PtDebugPrint("ahnyVogondolaRideV2.OnFirstUpdate(): All buttons disabled.", level=kWarningLevel)
         actCallbuttonHub.disable()
         actCallbuttonEngHut.disable()
         actHubChairClick.disable()
         actEngHutChairClick.disable()
         
         if ageSDL["ahnyVogOccupant"][0]:
-            print "%d is in the Vogondola" % (ageSDL["ahnyVogOccupant"][0])
+            PtDebugPrint("ahnyVogondolaRideV2.OnFirstUpdate(): {} is in the Vogondola.".format(ageSDL["ahnyVogOccupant"][0]), level=kWarningLevel)
             self.occupant = ageSDL["ahnyVogOccupant"][0]
         else:
-            print "Vogondola is empty"
+            PtDebugPrint("ahnyVogondolaRideV2.OnFirstUpdate(): Vogondola is empty.", level=kWarningLevel)
             PtAtTimeCallback(self.key, 0, 1)
 
     def OnTimer(self, id):
@@ -638,58 +577,55 @@ class ahnyVogondolaRideV2(ptResponder):
 
             # vogLoc: 0 = hub, 1 = in between, 2 = eng hut
             if vogLoc == 0:
-                print "Timer says SDL set to 0, Hut call and Hub chair enabled"
+                PtDebugPrint("ahnyVogondolaRideV2.OnTimer(): SDL set to 0, Hut call and Hub chair enabled.", level=kWarningLevel)
                 actCallbuttonEngHut.enable()
                 actHubChairClick.enable()
 
             elif vogLoc == 1:
-                print "Timer says SDL set to 1, Hut call and Hub call enabled"
+                PtDebugPrint("ahnyVogondolaRideV2.OnTimer(): SDL set to 1, Hut call and Hub call enabled.", level=kWarningLevel)
                 actCallbuttonEngHut.enable()
                 actCallbuttonHub.enable()
 
-                respHubChairLower.run(self.key, state = "lower", fastforward = 1)
+                respHubChairLower.run(self.key, state="lower", fastforward=1)
 
             elif vogLoc == 2:
-                print "Timer says SDL set to 2, Hut chair and Hub call enabled"
+                PtDebugPrint("ahnyVogondolaRideV2.OnTimer(): SDL set to 2, Hut chair and Hub call enabled.", level=kWarningLevel)
                 actCallbuttonHub.enable()
                 actEngHutChairClick.enable()
 
-                respEngHutChairLower.run(self.key, state = "raise", fastforward = 1)
-                respHubChairLower.run(self.key, state = "lower", fastforward = 1)
-                respVogRideStart.run(self.key, fastforward = 1)
-                respVogThrottle.run(self.key, state = "stop", fastforward = 1)
+                respEngHutChairLower.run(self.key, state="raise", fastforward=1)
+                respHubChairLower.run(self.key, state="lower", fastforward=1)
+                respVogRideStart.run(self.key, fastforward=1)
+                respVogThrottle.run(self.key, state="stop", fastforward=1)
 
         elif id == 2:
-            print "timer id 2 returned...run responder"
-            respHubChairLower.run(self.key, state = "raise")
+            PtDebugPrint("ahnyVogondolaRideV2.OnTimer(): Timer id 2 returned, raise Hub chair.", level=kWarningLevel)
+            respHubChairLower.run(self.key, state="raise")
 
         elif id == 3:
-            print "timer id 3 returned...run responder"
-            respEngHutChairLower.run(self.key, state = "raise")
-                
+            PtDebugPrint("ahnyVogondolaRideV2.OnTimer(): Timer id 3 returned, raise Hut chair.", level=kWarningLevel)
+            respEngHutChairLower.run(self.key, state="raise")
 
     def AvatarPage(self, avObj, pageIn, lastOut):
         if not pageIn and self.occupant:
             avID = PtGetClientIDFromAvatarKey(avObj.getKey())
             if avID == PtGetClientIDFromAvatarKey(self.occupant.getKey()):
-                print "Vogondola rider left, enabling call buttons."
+                PtDebugPrint("ahnyVogondolaRideV2.AvatarPage(): Vogondola rider left, enabling call buttons.", level=kWarningLevel)
                 actCallbuttonHub.enable()
                 actCallbuttonEngHut.enable()
                 sdl = PtGetAgeSDL()
                 sdl["ahnyVogOccupant"] = (0,)
                 self.occupant = None
 
-    def OnNotify(self,state,id,events):
-        print "-------------------------------------------------"
-        print "     notify: id= %d    state= %d" % (id,state)
+    def OnNotify(self, state, id, events):
+        PtDebugPrint("ahnyVogondolaRideV2.OnNotify(): id={}, state={}, events={}".format(id, state, events), level=kDebugDumpLevel)
         if PtFindAvatar(events):
-            print "     notify: Trigger= %s    Self= %s" % (str(PtGetClientIDFromAvatarKey(PtFindAvatar(events).getKey())),str(PtGetClientIDFromAvatarKey(PtGetLocalAvatar().getKey())))
-        print "     notify: events= %s" % (str(events))
-        print " "
-        
+            PtDebugPrint("ahnyVogondolaRideV2.OnNotify(): Trigger={}, Self={}".format(
+                PtGetClientIDFromAvatarKey(PtFindAvatar(events).getKey()),
+                PtGetClientIDFromAvatarKey(PtGetLocalAvatar().getKey())), level=kDebugDumpLevel)
+
         if id == actHubChairClick.id and state:
             sdl = PtGetAgeSDL()
-            print "SETTING SDL TO 1"
             sdl["ahnyVogLocation"] = (1,)
             sdl["ahnyVogOccupant"] = (PtFindAvatar(events).getKey(),)
             self.occupant = PtFindAvatar(events)
@@ -700,14 +636,13 @@ class ahnyVogondolaRideV2(ptResponder):
                 cam.undoFirstPerson()
                 cam.disableFirstPersonOverride()
                 
-                respVogRideReset.run(self.key, state = "hub", fastforward = 1)
+                respVogRideReset.run(self.key, state="hub", fastforward=1)
                 self.direction = 1
                 self.currentBrain = InHubBrain(self)
                 self.currentBrain.OnNotify(state, id, events)
 
         elif id == actEngHutChairClick.id and state:
             sdl = PtGetAgeSDL()
-            print "SETTING SDL TO 1"
             sdl["ahnyVogLocation"] = (1,)
             sdl["ahnyVogOccupant"] = (PtFindAvatar(events).getKey(),)
             self.occupant = PtFindAvatar(events)
@@ -718,44 +653,40 @@ class ahnyVogondolaRideV2(ptResponder):
                 cam.undoFirstPerson()
                 cam.disableFirstPersonOverride()
                 
-                respVogRideReset.run(self.key, state = "eng hut", fastforward = 1)
+                respVogRideReset.run(self.key, state="eng hut", fastforward=1)
                 self.direction = 1
                 self.currentBrain = InEngHutBrain(self)
                 self.currentBrain.OnNotify(state, id, events)
 
         elif id == actCallbuttonHub.id and state:
-            print "call button hub clicked"
+            PtDebugPrint("ahnyVogondolaRideV2.OnNotify(): Call button hub clicked.", level=kWarningLevel)
             VogondolaIsOccupied(1)
-            respHubCallbutton.run(self.key, events = events)
+            respHubCallbutton.run(self.key, events=events)
             sdl = PtGetAgeSDL()
             if sdl["ahnyVogLocation"][0] == 2:
-                respEngHutChairLower.run(self.key, state = "lower")
-
-            print "SETTING SDL TO 0"
+                respEngHutChairLower.run(self.key, state="lower")
             sdl["ahnyVogLocation"] = (0,)
 
         elif id == respHubCallbutton.id:
-            print "call button hub returned"
+            PtDebugPrint("ahnyVogondolaRideV2.OnNotify(): Call button hub returned.", level=kDebugDumpLevel)
             PtAtTimeCallback(self.key, 5, 2)
 
         elif id == actCallbuttonEngHut.id and state:
-            print "call button hut clicked"
+            PtDebugPrint("ahnyVogondolaRideV2.OnNotify(): Call button hut clicked.", level=kWarningLevel)
             VogondolaIsOccupied(1)
-            respEngHutCallbutton.run(self.key, events = events)
+            respEngHutCallbutton.run(self.key, events=events)
             sdl = PtGetAgeSDL()
             if sdl["ahnyVogLocation"][0] == 0:
-                respHubChairLower.run(self.key, state = "lower")
-
-            print "SETTING SDL TO 2"
+                respHubChairLower.run(self.key, state="lower")
             sdl["ahnyVogLocation"] = (2,)
 
         elif id == respEngHutCallbutton.id:
-            print "call button hut returned"
+            PtDebugPrint("ahnyVogondolaRideV2.OnNotify(): Call button hut returned.", level=kDebugDumpLevel)
             PtAtTimeCallback(self.key, 5, 3)
 
         elif id == respHubChairLower.id and self.currentBrain == None:
             if self.occupant == PtGetLocalAvatar():
-                print "Hub Chair came up, Hub chair enabled"
+                PtDebugPrint("ahnyVogondolaRideV2.OnNotify(): Hub chair came up, Hub chair enabled.", level=kWarningLevel)
                 actHubChairClick.enable()
 
                 cam = ptCamera()
@@ -766,12 +697,12 @@ class ahnyVogondolaRideV2(ptResponder):
             sdl = PtGetAgeSDL()
             sdl["ahnyVogOccupant"] = (0,)
             self.occupant = None
-            print "Hub Chair came up, Hut call enabled"
+            PtDebugPrint("ahnyVogondolaRideV2.OnNotify(): Hub chair came up, Hut call enabled.", level=kWarningLevel)
             actCallbuttonEngHut.enable()
             
         elif id == respEngHutChairLower.id and self.currentBrain == None:
             if self.occupant == PtGetLocalAvatar():
-                print "Hut Chair came up, Hut chair enabled"
+                PtDebugPrint("ahnyVogondolaRideV2.OnNotify(): Hut chair came up, Hut chair enabled.", level=kWarningLevel)
                 actEngHutChairClick.enable()
 
                 cam = ptCamera()
@@ -782,31 +713,20 @@ class ahnyVogondolaRideV2(ptResponder):
             sdl = PtGetAgeSDL()
             sdl["ahnyVogOccupant"] = (0,)
             self.occupant = None
-            print "Hut Chair came up, Hub call enabled"
+            PtDebugPrint("ahnyVogondolaRideV2.OnNotify(): Hut chair came up, Hub call enabled.", level=kWarningLevel)
             actCallbuttonHub.enable()
 
         elif (id == actStopVogSoundForward.id or id == actStopVogSoundBackward.id) and state:
-            #DisableVogControls()
             actStopVogSoundForward.disable()
             actStopVogSoundBackward.disable()
-            print "running respSounds: state - stop loc - anim event det", id, state
-            respSounds.run(self.key, state = "stop")
+            PtDebugPrint("ahnyVogondolaRideV2.OnNotify(): Running respSounds: state - stop loc - anim event det {} {}".format(id, state), level=kDebugDumpLevel)
+            respSounds.run(self.key, state="stop")
 
         else:
             if self.currentBrain != None:
-                print "passing event on to sub-brain"
+                PtDebugPrint("ahnyVogondolaRideV2.OnNotify(): Passing event on to sub-brain.", level=kDebugDumpLevel)
                 self.currentBrain.OnNotify(state, id, events)
 
     def OnBackdoorMsg(self, target, param):
-        if target == "vog":
-            if param == "currentbrain":
-                if self.currentBrain == None:
-                    print "Vog Current Brain: None"
-                else:
-                    print "Vog Current Brain:", self.currentBrain.name
-
-            elif param == "beh":
-                avatar = PtGetLocalAvatar()
-                #behEngHutChairClimb.run(avatar)
-                #behEngHutChairClimb.gotoStage(avatar, 1)
-                    
+        if target == "vog" and param == "currentbrain":
+            PtDebugPrint("ahnyVogondolaRideV2.OnNotify(): Current Vog Brain = {}".format(type(self.currentBrain).__name__), level=kDebugDumpLevel)

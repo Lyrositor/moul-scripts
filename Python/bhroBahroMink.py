@@ -53,50 +53,34 @@ from PlasmaTypes import *
 from PlasmaKITypes import *
 from xPsnlVaultSDL import *
 
-# define the attributes that will be entered in max
-clickable       = ptAttribActivator(1, "clickable")
-respRing        = ptAttribResponder(2, "resp: Ring")
+# Define the attributes that will be entered in Max.
+clickable = ptAttribActivator(1, "clickable")
+respRing = ptAttribResponder(2, "resp: Ring")
 
-# define global variables
 
-#====================================
 class bhroBahroMink(ptResponder):
-    ###########################
+
     def __init__(self):
         ptResponder.__init__(self)
         self.id = 8815
         self.version = 1
-        print "bhroBahroMink: init  version = %d" % self.version
+        PtDebugPrint("bhroBahroMink: v{}".format(self.version), level=kWarningLevel)
 
-    ###########################
-    def __del__(self):
-        pass
-
-    ###########################
     def OnFirstUpdate(self):
-        global gAgeStartedIn
+        PtSendKIMessage(kDisableYeeshaBook, 0)
 
-        gAgeStartedIn = PtGetAgeName()
-        PtSendKIMessage(kDisableYeeshaBook,0)
-
-    ###########################
     def OnServerInitComplete(self):
         psnlSDL = xPsnlVaultSDL()
-        print psnlSDL["psnlBahroWedge11"][0]
-
         if psnlSDL["psnlBahroWedge11"][0]:
-            print "bhroBahroMink.OnServerInitComplete: You have the Minkata wedge, no need to display it."
+            PtDebugPrint("bhroBahroMink.OnServerInitComplete(): You have the Minkata wedge, no need to display it.", level=kWarningLevel)
             respRing.run(self.key, fastforward=1)
 
-    ###########################
-    def OnNotify(self,state,id,events):
-        #print "bhroBahroMink.OnNotify: state=%s id=%d events=" % (state, id), events
-
+    def OnNotify(self, state, id, events):
         if id == clickable.id and not state:
-            print "bhroBahroMink.OnNotify: clicked Minkata Spiral"
+            PtDebugPrint("bhroBahroMink.OnNotify(): Clicked Minkata Spiral.", level=kWarningLevel)
             respRing.run(self.key, avatar=PtFindAvatar(events))
             psnlSDL = xPsnlVaultSDL()
             sdlVal = psnlSDL["psnlBahroWedge11"][0]
             if not sdlVal:
-                print "bhroBahroMink.OnNotify:  Turning wedge SDL of psnlBahroWedge11 to On"
+                PtDebugPrint("bhroBahroMink.OnNotify(): Turning wedge SDL of psnlBahroWedge11 to On.", level=kWarningLevel)
                 psnlSDL["psnlBahroWedge11"] = (1,)

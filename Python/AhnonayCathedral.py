@@ -49,15 +49,14 @@ Date: June 2003
 from Plasma import *
 from PlasmaTypes import *
 
+
 class AhnonayCathedral(ptResponder):
 
     def __init__(self):
         ptResponder.__init__(self)
         self.id = 5398
         self.version = 1
-
-    def OnFirstUpdate(self):
-        pass
+        PtDebugPrint("AhnonayCathedral: v{}".format(self.version), level=kWarningLevel)
 
     def OnServerInitComplete(self):
         owner = None
@@ -80,13 +79,9 @@ class AhnonayCathedral(ptResponder):
                         if chron and chron.getName() == "AhnonayOwner":
                             owner = chron
                     break
-        if owner == None and vault.amOwnerOfCurrentAge():
-            print "I own this Cathedral, but I haven't set myself as Ahnonay owner yet."
+        if owner is None and vault.amOwnerOfCurrentAge():
+            PtDebugPrint("AhnonayCathedral.OnServerInitComplete(): I own this Cathedral, but I haven't set myself as Ahnonay owner yet.", level=kWarningLevel)
             newNode = ptVaultChronicleNode(0)
             newNode.chronicleSetName("AhnonayOwner")
             newNode.chronicleSetValue(str(PtGetClientIDFromAvatarKey(PtGetLocalAvatar().getKey())))
             ageDataFolder.addNode(newNode)
-
-    def OnNotify(self,state,id,events):
-        pass
-        

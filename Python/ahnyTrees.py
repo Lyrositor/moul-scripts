@@ -51,77 +51,61 @@ Ahnonay Quab control
 from Plasma import *
 from PlasmaTypes import *
 
+# Define the attributes that will be entered in Max.
+rgnTrees = ptAttribActivator(1, "act: Tree Detector")
+respTreeAnims = ptAttribResponderList(2, "resp: Tree Anims", byObject=1)
+objTrees = ptAttribSceneobjectList(3, "obj: Tree Meshs")
+SDLTrees = ptAttribString(4, "str: SDL Trees (optional)")
 
-# define the attributes that will be entered in max
-rgnTrees                    = ptAttribActivator(1, "act: Tree Detector")
-respTreeAnims               = ptAttribResponderList(2, "resp: Tree Anims", byObject=1)
-objTrees                    = ptAttribSceneobjectList(3, "obj: Tree Meshs")
-SDLTrees                    = ptAttribString(4, "str: SDL Trees (optional)")
 
-# globals
-respTreeAnimsList           = []
-objTreeList                 = []
-
-#====================================
 class ahnyTrees(ptModifier):
-    ###########################
+
     def __init__(self):
         ptModifier.__init__(self)
         self.id = 5948
-        version = 1
-        self.version = version
-        print "__init__ahnyTrees v%d " % (version)
+        self.version = 1
+        PtDebugPrint("ahnyTrees: v{}".format(self.version), level=kWarningLevel)
 
-    ###########################
+        self.respTreeAnimsList = []
+        self.objTreeList = []
+
     def OnFirstUpdate(self):
-        global respTreeAnimsList
-        global objTreeList
-
         try:
             ageSDL = PtGetAgeSDL()
-            ageSDL[SDLTrees.value][0]
         except:
-            print "ahnyTrees.OnServerInitComplete(): ERROR --- Cannot find the Ahnonay Age SDL"
-            ageSDL[SDLTrees.value] = (1,1,1,1,1,1,1,1,1,1,1,1,1,1,1)
+            PtDebugPrint("ahnyTrees.OnFirstUpdate(): Cannot find the Ahnonay Age SDL.", level=kErrorLevel)
+            ageSDL[SDLTrees.value] = (1,)*15
 
-        ageSDL.setFlags(SDLTrees.value,1,1)
+        ageSDL.setFlags(SDLTrees.value, 1, 1)
         ageSDL.sendToClients(SDLTrees.value)
-        ageSDL.setNotify(self.key,SDLTrees.value,0.0)
+        ageSDL.setNotify(self.key, SDLTrees.value, 0.0)
 
         for responder in respTreeAnims.value:
-            thisResp = responder.getName()
-            respTreeAnimsList.append(thisResp)
+            self.respTreeAnimsList.append(responder.getName())
 
-        for object in objTrees.value:
-            thisObj = object.getName()
-            objTreeList.append(thisObj)
+        for obj in objTrees.value:
+            self.objTreeList.append(obj.getName())
 
         ageSDL = PtGetAgeSDL()
-        idx = 0
-        for visible in ageSDL[SDLTrees.value]:
+        for idx, visible in enumerate(ageSDL[SDLTrees.value]):
             if not visible:
-                respTreeAnims.run(self.key, objectName=respTreeAnimsList[idx], fastforward=1)
-            idx += 1
+                respTreeAnims.run(self.key, objectName=self.respTreeAnimsList[idx], fastforward=1)
 
-    ###########################
-    def OnNotify(self,state,id,events):
-        global respTreeAnimsList
-        global objTreeList
-        print "ahnyTrees.OnNotify: state=%s id=%d events=" % (state, id), events
+    def OnNotify(self, state, id, events):
+        PtDebugPrint("ahnyTrees.OnNotify(): state={} id={} events={}".format(state, id, events), level=kDebugDumpLevel)
 
+        ageSDL = PtGetAgeSDL()
         if id == rgnTrees.id:
             for event in events:
-                if event[0] == kCollisionEvent and self.sceneobject.isLocallyOwned() :
+                if event[0] == kCollisionEvent and self.sceneobject.isLocallyOwned():
                     region = event[3]
                     regName = region.getName()
-                    for object in objTreeList:
+                    for object in self.objTreeList:
                         if object == regName:
-                            ageSDL = PtGetAgeSDL()
                             treeSDL = list(ageSDL[SDLTrees.value])
-                            index = objTreeList.index(object)
+                            index = self.objTreeList.index(object)
                             if treeSDL[index]:
-                                respTreeAnims.run(self.key, objectName=respTreeAnimsList[index], netForce = 1)
+                                respTreeAnims.run(self.key, objectName=self.respTreeAnimsList[index], netForce=1)
                                 treeSDL[index] = 0
                                 ageSDL[SDLTrees.value] = tuple(treeSDL)
-                                print "ahnyTrees.OnNotify: Tree knocked down"
-
+                                PtDebugPrint("ahnyTrees.OnNotify(): Tree knocked down.", level=kWarningLevel)

@@ -49,20 +49,21 @@ Date: June 2003
 from Plasma import *
 from PlasmaTypes import *
 
-click = ptAttribActivator(1,"chair clickable")
-climb = ptAttribBehavior(2,"climb behavior")
-lower = ptAttribNamedResponder(3,"chair lower responder")
-ride = ptAttribResponder(4,"ride")
-dummy = ptAttribSceneobject(5,"dummy")
-subworld = ptAttribSceneobject(6,"subworld")
-eject1 = ptAttribActivator(7,"eject at hub")
-eject2 = ptAttribActivator(8,"eject at hut")
-ejectResp1 = ptAttribResponder(9,"eject responder hub")
-ejectResp2 = ptAttribResponder(10,"eject responder hut")
-ejectPt1 = ptAttribSceneobject(11,"eject point hub")
-ejectPt2 = ptAttribSceneobject(12,"eject point hut")
-hutChairClickable = ptAttribActivator(13,"clickable for the hut")
-beginHutRide = ptAttribResponder(14,"hut side ride responder")
+click = ptAttribActivator(1, "chair clickable")
+climb = ptAttribBehavior(2, "climb behavior")
+lower = ptAttribNamedResponder(3, "chair lower responder")
+ride = ptAttribResponder(4, "ride")
+dummy = ptAttribSceneobject(5, "dummy")
+subworld = ptAttribSceneobject(6, "subworld")
+eject1 = ptAttribActivator(7, "eject at hub")
+eject2 = ptAttribActivator(8, "eject at hut")
+ejectResp1 = ptAttribResponder(9, "eject responder hub")
+ejectResp2 = ptAttribResponder(10, "eject responder hut")
+ejectPt1 = ptAttribSceneobject(11, "eject point hub")
+ejectPt2 = ptAttribSceneobject(12, "eject point hut")
+hutChairClickable = ptAttribActivator(13, "clickable for the hut")
+beginHutRide = ptAttribResponder(14, "hut side ride responder")
+
 
 class AhnyVogondolaRide(ptResponder):
 
@@ -70,61 +71,52 @@ class AhnyVogondolaRide(ptResponder):
         ptResponder.__init__(self)
         self.id = 4395
         self.version = 1
-
-    def OnFirstUpdate(self):
-        pass
+        PtDebugPrint("ahnyVogondolaRide: v{}".format(self.version), level=kWarningLevel)
         
-    def Load(self):
-        pass        
-        
-    def OnNotify(self,state,id,events):
-        
-        if (id == click.id and state):
+    def OnNotify(self, state, id, events):
+        if id == click.id and state:
             avatar = PtFindAvatar(events)
             climb.run(avatar)
-            print"clicked on chair"
+            PtDebugPrint("ahnyVogondolaRide.OnNotify(): Clicked on chair.", level=kDebugDumpLevel)
             return
         
-        if (id == hutChairClickable.id and state):
+        if id == hutChairClickable.id and state:
             theAvatar = PtFindAvatar(events)
             theAvatar.physics.warpObj(dummy.value.getKey())
-            PtAttachObject(theAvatar.getKey(),dummy.value.getKey())
+            PtAttachObject(theAvatar.getKey(), dummy.value.getKey())
             theAvatar.avatar.enterSubWorld(subworld.value)
-            print"pinned avatar"
-            beginHutRide.run(self.key,avatar=theAvatar)
+            PtDebugPrint("ahnyVogondolaRide.OnNotify(): Pinned avatar.", level=kDebugDumpLevel)
+            beginHutRide.run(self.key, avatar=theAvatar)
         
-        if (id == climb.id):
+        if id == climb.id:
             for event in events:
                 if event[0] == kMultiStageEvent and event[1] == 0 and event[2] == kEnterStage:
-                    lower.run(self.key,avatar=PtGetLocalAvatar())
-                    print"finished smart-seek"
+                    lower.run(self.key, avatar=PtGetLocalAvatar())
+                    PtDebugPrint("ahnyVogondolaRide.OnNotify(): Finished smart-seek.", level=kDebugDumpLevel)
                 elif event[0] == kMultiStageEvent and event[1] == 0 and event[2] == kAdvanceNextStage:
-                    theAvatar=PtGetLocalAvatar()
+                    theAvatar = PtGetLocalAvatar()
                     theAvatar.physics.warpObj(dummy.value.getKey())
-                    PtAttachObject(theAvatar.getKey(),dummy.value.getKey())
+                    PtAttachObject(theAvatar.getKey(), dummy.value.getKey())
                     theAvatar.avatar.enterSubWorld(subworld.value)
-                    print"pinned avatar"
-                    ride.run(self.key,avatar=theAvatar)
+                    PtDebugPrint("ahnyVogondolaRide.OnNotify(): Pinned avatar.", level=kDebugDumpLevel)
+                    ride.run(self.key, avatar=theAvatar)
         
-        if (id == eject1.id and state):
-            ejectResp1.run(self.key,avatar=PtGetLocalAvatar())
+        if id == eject1.id and state:
+            ejectResp1.run(self.key, avatar=PtGetLocalAvatar())
         
-        if (id == eject2.id and state):
-            ejectResp2.run(self.key,avatar=PtGetLocalAvatar())
+        if id == eject2.id and state:
+            ejectResp2.run(self.key, avatar=PtGetLocalAvatar())
             
-        if (id == ejectResp1.id and state):
-            theAvatar=PtGetLocalAvatar()
-            PtDetachObject(theAvatar.getKey(),dummy.value.getKey())
+        if id == ejectResp1.id and state:
+            theAvatar = PtGetLocalAvatar()
+            PtDetachObject(theAvatar.getKey(), dummy.value.getKey())
             theAvatar.avatar.exitSubWorld()
             theAvatar.physics.warpObj(ejectPt1.value.getKey())
-            print"ejecting at the hub"
+            PtDebugPrint("ahnyVogondolaRide.OnNotify(): Ejecting at the hub.", level=kDebugDumpLevel)
             
-        if (id == ejectResp2.id and state):
-            theAvatar=PtGetLocalAvatar()
-            PtDetachObject(theAvatar.getKey(),dummy.value.getKey())
+        if id == ejectResp2.id and state:
+            theAvatar = PtGetLocalAvatar()
+            PtDetachObject(theAvatar.getKey(), dummy.value.getKey())
             theAvatar.avatar.exitSubWorld()
             theAvatar.physics.warpObj(ejectPt2.value.getKey())
-            print"ejecting at the hut"        
-        
-        
-             
+            PtDebugPrint("ahnyVogondolaRide.OnNotify(): Ejecting at the hut.", level=kDebugDumpLevel)

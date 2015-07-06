@@ -50,39 +50,11 @@ Event Manager hooks for BaronCityOffice
 from Plasma import *
 from PlasmaTypes import *
 
+
 class BaronCityOffice(ptResponder):
 
     def __init__(self):
         ptResponder.__init__(self)
         self.id = 5208
         self.version = 1
-
-    def OnFirstUpdate(self):
-        #~ # record our visit in player's chronicle
-        #~ kModuleName = "Garden"
-        #~ kChronicleVarName = "LinksIntoGarden"
-        #~ kChronicleVarType = 0
-        #~ vault = ptVault()
-        #~ if type(vault) != type(None):
-            #~ entry = vault.findChronicleEntry(kChronicleVarName)
-            #~ if type(entry) == type(None):
-                #~ # not found... add current level chronicle
-                #~ vault.addChronicleEntry(kChronicleVarName,kChronicleVarType,"%d" %(1))
-                #~ PtDebugPrint("%s:\tentered new chronicle counter %s" % (kModuleName,kChronicleVarName))
-            #~ else:
-                #~ import string
-                #~ count = string.atoi(entry.chronicleGetValue())
-                #~ count = count + 1
-                #~ entry.chronicleSetValue("%d" % (count))
-                #~ entry.save()
-                #~ PtDebugPrint("%s:\tyour current count for %s is %s" % (kModuleName,kChronicleVarName,entry.chronicleGetValue()))
-        #~ else:
-            #~ PtDebugPrint("%s:\tERROR trying to access vault -- can't update %s variable in chronicle." % (kModuleName,kChronicleVarName))
-        pass
-        
-    def Load(self):
-        pass        
-        
-    def OnNotify(self,state,id,events):
-        pass
-        
+        PtDebugPrint("BaronCityOffice: v{}".format(self.version), level=kWarningLevel)
